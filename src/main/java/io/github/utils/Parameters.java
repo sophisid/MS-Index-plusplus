@@ -70,6 +70,20 @@ public class Parameters {
     public static SegmentMethods segmentMethod = SegmentMethods.ADHOC;
     public static double segmentParameter = 0;
 
+    // MSINDEXPP related
+    public static boolean enableAuxIndex = true;
+    public static double auxSampleRatio = 0.03;
+
+    public static boolean enableRCDetector = true;
+    public static double rcThresholdRaw = 1.6;
+    public static double rcThresholdNorm = 1.4;
+    public static int rcMBRSample = 128;
+
+    public static boolean enableTinyScan = true;
+    public static int tinyScanLeaves = 24;
+
+
+
     //    Set later
     @Hide public static ArrayList<Path> variatePaths = new ArrayList<>();
     public static String[] selectedVariatesNames;

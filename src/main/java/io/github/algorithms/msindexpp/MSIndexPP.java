@@ -1,9 +1,10 @@
 package io.github.algorithms.msindexpp;
 
 import io.github.algorithms.Algorithm;
-import io.github.utils.KMeans;
+import io.github.algorithms.mass.MVMASS;
 import io.github.algorithms.msindexpp.segmentation.AdhocSegment;
 import io.github.algorithms.msindexpp.segmentation.SegmentMethods;
+import io.github.io.DataManager;
 import io.github.utils.*;
 import io.github.utils.rtreemulti.Entry;
 import io.github.utils.rtreemulti.Node;
@@ -16,26 +17,31 @@ import java.io.*;
 import java.util.*;
 import java.util.logging.Logger;
 
-import static java.util.stream.Collectors.toList;
 import static io.github.utils.Parameters.*;
+import static java.util.stream.Collectors.toList;
 
 public class MSIndexPP extends Algorithm {
+    private static final int RC_SERIES_SAMPLES = 8; 
+    private static final int RC_WINDOW_SAMPLES = 16; 
+    private static final double RC_THRESHOLD = 1.06;  
+    private static final double EPS = 1e-12;
+
+
+    private MVMASS massEngine = null;
+
     final KMeans[] kMeans = new KMeans[channels];
     RTree<CandidateSegment, Geometry> tree;
     private final int treeDimensions = fourierLength();
 
-//    Boolean indicating if we want to use the index or not (in 2nd case we stop at root)
     private boolean buildTree = true;
 
     public MSIndexPP(boolean buildTree) {
         this.buildTree = buildTree;
-
         DFTUtils.computeKMeansClusters(kMeans);
     }
 
     @Override
     public String getIndexPath() {
-//        Make folder index_caches if it does not exist
         File folder = new File("index_caches");
         if (!folder.exists()) {
             folder.mkdir();
@@ -43,7 +49,7 @@ public class MSIndexPP extends Algorithm {
 
         return "index_caches/" + String.join("_",
                 algorithmType.toString(),
-                datasetName.toString(),
+                datasetName,
                 String.valueOf(N),
                 String.valueOf(maxM),
                 String.valueOf(seed),
@@ -58,36 +64,31 @@ public class MSIndexPP extends Algorithm {
     }
 
     private void createTree(List<Entry<CandidateSegment, Geometry>> items){
-//        Insert all the segments into the R-tree
-        Logger.getGlobal().info("[MS-Index] Building the R-tree");
+        Logger.getGlobal().info("[MS-Index++] Building the R-tree " + (buildTree ? "[MAIN]" : "[AUX]"));
         tree = RTree.star().dimensions(treeDimensions).leafSize(buildTree ? indexLeafSize: Integer.MAX_VALUE).create(items);
 
-        //            Do ad-hoc segmentation if necessary
         if (segmentMethod.equals(SegmentMethods.ADHOC)) {
-            Logger.getGlobal().info("[MS-Index] Post-index segmentation");
+            Logger.getGlobal().info("[MS-Index++] Post-index segmentation");
             AdhocSegment.postIndexSegment(tree);
         }
     }
 
     public void buildIndex() {
-//        Get all the segments from the dataset
-        Logger.getGlobal().info("[MS-Index] Segmenting the fourier trails");
+        Logger.getGlobal().info("[MS-Index++] Segmenting the fourier trails");
         final List<Entry<CandidateSegment, Geometry>> items = DFTUtils.getSegmentedFourierTrail(kMeans);
-
-//        Create the R-tree
         createTree(items);
     }
 
     @Override
     public void saveIndex() {
         String filename = getIndexPath();
-
-//        Serialize the tree
         try{
-            Logger.getGlobal().info("[MS-Index] Saving the index to file");
+            Logger.getGlobal().info("[MS-Index++] Saving the index to file");
             FileOutputStream fileOut = new FileOutputStream(filename);
             ObjectOutputStream out = new ObjectOutputStream(fileOut);
             out.writeObject(tree);
+            out.close();
+            fileOut.close();
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -96,34 +97,122 @@ public class MSIndexPP extends Algorithm {
     @Override
     public Algorithm loadIndex() {
         String filename = getIndexPath();
-
         try {
-            Logger.getGlobal().info("[MS-Index] Loading the index from file");
+            Logger.getGlobal().info("[MS-Index++] Loading the index from file");
             FileInputStream fileIn = new FileInputStream(filename);
             ObjectInputStream in = new ObjectInputStream(fileIn);
             tree = (RTree<CandidateSegment, Geometry>) in.readObject();
-            Logger.getGlobal().info("[MS-Index] Index loaded");
+            in.close();
+            fileIn.close();
+            Logger.getGlobal().info("[MS-Index++] Index loaded");
         } catch (IOException | ClassNotFoundException e) {
             e.printStackTrace();
         }
         return this;
     }
 
+    private static double edWindow(double[] series, int start, double[] q, boolean zNorm) {
+        double sum = 0.0;
+        if (!zNorm) {
+            for (int i = 0; i < qLen; i++) {
+                double diff = series[start + i] - q[i];
+                sum += diff * diff;
+            }
+            return Math.sqrt(sum);
+        } else {
+            double muS = 0.0, muQ = 0.0;
+            for (int i = 0; i < qLen; i++) {
+                muS += series[start + i];
+                muQ += q[i];
+            }
+            muS /= qLen;
+            muQ /= qLen;
+
+            double varS = 0.0, varQ = 0.0;
+            for (int i = 0; i < qLen; i++) {
+                double ds = series[start + i] - muS;
+                double dq = q[i] - muQ;
+                varS += ds * ds;
+                varQ += dq * dq;
+            }
+            double stdS = Math.sqrt(Math.max(varS, 0.0) + EPS);
+            double stdQ = Math.sqrt(Math.max(varQ, 0.0) + EPS);
+
+            for (int i = 0; i < qLen; i++) {
+                double zs = (series[start + i] - muS) / stdS;
+                double zq = (q[i] - muQ) / stdQ;
+                double diff = zs - zq;
+                sum += diff * diff;
+            }
+            return Math.sqrt(sum);
+        }
+    }
+
+    private double estimateRC_viaSamples(double[][] query) {
+        final double[][][] data = DataManager.data;
+        if (data.length == 0) return 1.0;
+
+        double min = Double.POSITIVE_INFINITY;
+        double max = Double.NEGATIVE_INFINITY;
+
+        for (int s = 0; s < RC_SERIES_SAMPLES; s++) {
+            int tsId = random.nextInt(data.length);
+            final int M = DataManager.getM(tsId);
+            final int lim = Math.max(1, M - qLen + 1);
+
+            for (int w = 0; w < RC_WINDOW_SAMPLES; w++) {
+                int start = random.nextInt(lim);
+
+                double dist2 = 0.0;
+                for (int ch : selectedVariatesIdx) {
+                    dist2 += Math.pow(edWindow(data[tsId][ch], start, query[ch], normalize), 2);
+                }
+                double d = Math.sqrt(dist2);
+
+                if (d < min) min = d;
+                if (d > max) max = d;
+            }
+        }
+
+        if (!Double.isFinite(min) || !Double.isFinite(max)) return 1.0;
+        return max / Math.max(min, EPS);
+    }
+
+    private MVMASS getMassEngine() {
+        if (massEngine == null) {
+            Logger.getGlobal().info("[MS-Index++] RC low ⇒ building MASS engine once");
+            massEngine = new MVMASS();
+            long t0 = System.currentTimeMillis();
+            massEngine.buildIndex();
+            long t1 = System.currentTimeMillis();
+            Logger.getGlobal().info("[MS-Index++] MASS FFTs built in " + (t1 - t0) + "ms");
+        }
+        return massEngine;
+    }
 
 
     public ArrayList<CandidateMVSubsequence> kNN(int k, double[][] query) {
-//        Compute the first f DFT-coefficients of the query, and prepare it for the R-tree search.
+        double rc = estimateRC_viaSamples(query);
+        Logger.getGlobal().info(String.format("[MS-Index++] RC estimate: %.5f (thr=%.3f)", rc, RC_THRESHOLD));
+
+        if (rc < RC_THRESHOLD) {
+            Logger.getGlobal().info("[MS-Index++] Skipping index; falling back to MASS");
+            ArrayList<CandidateMVSubsequence> res = new ArrayList<>(getMassEngine().kNN(k, query));
+            subsequencesExhChecked.getAndAdd(nSubsequences);
+            segmentsUnderThreshold.getAndAdd(N);
+            return res;
+        }
+
         final Tuple2<double[], LandmarkPortfolio> queryDFTs = DFTUtils.getQueryDFTs(query, kMeans);
         final double[] fftQFlat = queryDFTs._1();
         final LandmarkPortfolio queryPortfolio = queryDFTs._2();
-        final MinimumBoundingRectangle queryMBR = new MinimumBoundingRectangle(fftQFlat, fftQFlat, kMeansClusters == 0 ? null: new LandmarkMBR(queryPortfolio));
+        final MinimumBoundingRectangle queryMBR =
+                new MinimumBoundingRectangle(fftQFlat, fftQFlat, kMeansClusters == 0 ? null : new LandmarkMBR(queryPortfolio));
 
-//        Derive an initial top k.
         final ArrayList<CandidateMVSubsequence> initialTopK = firstPass(k, query, queryMBR);
         final double kThDistance = initialTopK.get(k - 1).totalDistance;
-        Logger.getGlobal().info("[MS-Index] k-th distance after initial topK: " + kThDistance);
+        Logger.getGlobal().info("[MS-Index++] k-th distance after initial topK: " + kThDistance);
 
-//        Derive the exact topK
         final ArrayList<CandidateMVSubsequence> finalTopK = secondPass(k, query, queryMBR, kThDistance);
 
         if (finalTopK.isEmpty()) {
@@ -133,12 +222,10 @@ public class MSIndexPP extends Algorithm {
     }
 
     private ArrayList<CandidateMVSubsequence> firstPass(int k, double[][] query, MinimumBoundingRectangle queryMBR) {
-        //        Get the closest r-tree entries (i.e., segments in the time series) to the query.
         long start = System.currentTimeMillis();
         final List<CandidateSegment> candidateSegments = closest(queryMBR, k);
         indexSearchTime += System.currentTimeMillis() - start;
 
-        //       Derive a current top k.
         start = System.currentTimeMillis();
         ArrayList<CandidateMVSubsequence> initialTopK = postFilter(query, candidateSegments, k, Double.POSITIVE_INFINITY);
         exhaustiveTime += System.currentTimeMillis() - start;
@@ -147,7 +234,6 @@ public class MSIndexPP extends Algorithm {
     }
 
     private ArrayList<CandidateMVSubsequence> secondPass(int k, double[][] query, MinimumBoundingRectangle queryMBR, double threshold) {
-        //        Get the final candidates from the R-tree.
         long start = System.currentTimeMillis();
         final Iterable<Entry<CandidateSegment, Geometry>> finalCandidates = tree.search(queryMBR, new RunningThreshold(threshold));
 
@@ -155,7 +241,7 @@ public class MSIndexPP extends Algorithm {
 
         segmentsUnderThreshold.getAndAdd(finalCandidatesList.size());
 
-        Logger.getGlobal().info("[MS-Index] Under threshold candidates: " + finalCandidatesList.size());
+        Logger.getGlobal().info("[MS-Index++] Under threshold candidates: " + finalCandidatesList.size());
         indexSearchTime += System.currentTimeMillis() - start;
 
         start = System.currentTimeMillis();
@@ -171,11 +257,8 @@ public class MSIndexPP extends Algorithm {
 
         for (Entry<CandidateSegment, Geometry> entry : tree.search(queryMBR, runningThreshold)) {
             final CandidateSegment candidateSegment = entry.value();
-
-//            Compute the distance to the query
             q.add(candidateSegment);
 
-//            Update the running threshold
             if (q.size() == k) {
                 runningThreshold.set(q.peek().getCurrLB());
             }
@@ -194,13 +277,13 @@ public class MSIndexPP extends Algorithm {
         } else if (node instanceof LeafDefault) {
             LeafDefault<CandidateSegment, Geometry> leaf = (LeafDefault<CandidateSegment, Geometry>) node;
             long memoryUsage = tree.dimensions() * 8L * 2L; // mins, maxes
-            memoryUsage += leaf.count() * tree.dimensions() * 8L * 2L + leaf.count() * (4L * 3L + (kMeansClusters == 0 ? 0 : channels * 2L * 8L + channels * 4L)); // min and max coefficients, (timeSeries, subSequence, subsequenceEnd, landmarkDistanceMin, landmarkDistanceMax, preferredLandmarks)
+            memoryUsage += leaf.count() * tree.dimensions() * 8L * 2L + leaf.count() * (4L * 3L + (kMeansClusters == 0 ? 0 : channels * 2L * 8L + channels * 4L));
             return memoryUsage;
         }
         throw new IllegalStateException("Unknown node type " + node.getClass());
     }
 
     public double memoryUsage() {
-        return recursiveTreeMemoryUsage(tree.root().get()) / 1000000d;
+        return recursiveTreeMemoryUsage(tree.root().get()) / 1_000_000d;
     }
 }
