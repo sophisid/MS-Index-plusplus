@@ -134,7 +134,7 @@ public class Parameters {
 
 
 //        FFT config (only for fft-based algorithms
-        if (Arrays.asList(AlgorithmType.ST_INDEX, AlgorithmType.MSINDEX).contains(algorithmType)) {
+        if (Arrays.asList(AlgorithmType.ST_INDEX, AlgorithmType.MSINDEX, AlgorithmType.MSINDEXPP).contains(algorithmType)) {
             setFFTConfig(fftConfigPath);
         }
 
@@ -146,7 +146,7 @@ public class Parameters {
         if (!algorithmType.equals(AlgorithmType.BRUTE_FORCE)) {
             setPrecomputedFFTs();
         }
-        if (Arrays.asList(AlgorithmType.ST_INDEX,AlgorithmType.MSINDEX).contains(algorithmType)) {
+        if (Arrays.asList(AlgorithmType.ST_INDEX,AlgorithmType.MSINDEX, AlgorithmType.MSINDEXPP).contains(algorithmType)) {
             setPrecomputedAngles();
         }
     }
@@ -277,9 +277,9 @@ public class Parameters {
 
     }
 
-    public static void setLeafSize(long nSubsequences, double percentage) {
-        if (algorithmType.equals(AlgorithmType.MSINDEX)){
-            indexLeafSize = percentage == 0 ? 4: (int) Math.round(nSubsequences * percentage);
+   public static void setLeafSize(long nSubsequences, double percentage) {
+        if (algorithmType.equals(AlgorithmType.MSINDEX) || algorithmType.equals(AlgorithmType.MSINDEXPP)) {
+            indexLeafSize = percentage == 0 ? 4 : (int) Math.round(nSubsequences * percentage);
         } else {
             switch (algorithmType) {
                 case DSTREE:
@@ -292,7 +292,6 @@ public class Parameters {
                     break;
             }
         }
-
         System.out.println("Setting leaf size to " + indexLeafSize);
     }
 

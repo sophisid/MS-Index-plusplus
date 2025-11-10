@@ -6,6 +6,7 @@ import io.github.algorithms.BruteForce;
 import io.github.algorithms.dstree_org.MVDSTreeOrg;
 import io.github.algorithms.kvmatch.MultivariateKVMatch;
 import io.github.algorithms.msindex.MSIndex;
+import io.github.algorithms.msindexpp.MSIndexPP;
 import io.github.io.DataLoader;
 import io.github.io.DataManager;
 import io.github.io.WorkloadGenerator;
@@ -168,6 +169,9 @@ public class Main {
             case MSINDEX:
                 algorithm = new MSIndex(true);
                 break;
+            case MSINDEXPP:
+                algorithm = new MSIndexPP(true);
+                break;
             case BRUTE_FORCE:
                 algorithm = new BruteForce();
                 break;
@@ -195,7 +199,7 @@ public class Main {
         logger.info("Avg Subsequences Exhaustively Checked: " + subsequencesExhChecked.get() / (double) nQueries);
         logger.info("Avg Segments Under Threshold: " + segmentsUnderThreshold.get() / (double) nQueries);
         logger.info("Avg Bound Computations: " + nBoundComputations.get() / (double) nQueries);
-        if (Arrays.asList(AlgorithmType.DSTREE,AlgorithmType.ST_INDEX,AlgorithmType.MSINDEX).contains(algorithmType)) {
+        if (Arrays.asList(AlgorithmType.DSTREE,AlgorithmType.ST_INDEX,AlgorithmType.MSINDEX, AlgorithmType.MSINDEXPP).contains(algorithmType)) {
             logger.info("Set-up time: " + setUpTime + "ms");
             logger.info("Index search time: " + indexSearchTime + "ms");
             logger.info("Exhaustive search time: " + exhaustiveTime + "ms");

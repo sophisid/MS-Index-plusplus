@@ -6,5 +6,6 @@ public enum AlgorithmType {
     BRUTE_FORCE,
     ST_INDEX,
     MSINDEX,
+    MSINDEXPP,
     KV_MATCH
 }
