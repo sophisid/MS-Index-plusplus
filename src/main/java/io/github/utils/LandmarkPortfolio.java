@@ -32,6 +32,8 @@ public class LandmarkPortfolio implements Serializable {
     public int getClosestLandmark(int dimension) {
         return closestLandmarks[dimension];
     }
+    public double[][] getLandmarkDistances() { return landmarkDistances; }
+    public int[] getClosestLandmarks() { return closestLandmarks; }
 
     public double[] getClosestDistances() {
         if (closestDistances == null) {

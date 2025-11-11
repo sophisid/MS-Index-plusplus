@@ -56,6 +56,18 @@ public class Parameters {
     public static boolean queryFromIndexed = true;
     public static int kvMatchSegmentDivisor = 1;
 
+    //MSINDEXPP 
+    public static boolean applyWhitening = true;
+    public static double[] whitenMean = null;
+    public static double[] whitenStd  = null;
+    // public static double[] coeffWeights = null;
+
+    public static boolean oodGateEnabled = true;
+    public static double oodZMeanThr = 1.75;
+    public static double oodZMaxThr  = 3.0;
+    public static double oodInflateFactor = 1.15;
+
+
     @Hide
     public static Random random;
     public static boolean parallel = false; // Use parallelism

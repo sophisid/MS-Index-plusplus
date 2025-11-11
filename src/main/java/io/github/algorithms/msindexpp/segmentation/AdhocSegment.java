@@ -17,6 +17,10 @@ import static io.github.utils.Parameters.*;
 public class AdhocSegment extends Segmentation {
     static FourierTrail[] fourierTrails = new FourierTrail[N]; // Fourier trails for each time series
 
+    public static FourierTrail[] getFourierTrails() {
+        return fourierTrails;
+    }
+
     public List<Entry<CandidateSegment, Geometry>> segment(int idx, FourierTrail fourierTrail) {
         fourierTrails[idx] = fourierTrail;
 

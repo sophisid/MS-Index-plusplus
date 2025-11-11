@@ -20,6 +20,9 @@ import static io.github.utils.Parameters.*;
 
 @RequiredArgsConstructor
 public abstract class Algorithm {
+    protected void beforeQuerying() {
+        // NO-OP
+    }
 
     public void run() {
         Logger logger = Logger.getGlobal();
@@ -120,6 +123,7 @@ public abstract class Algorithm {
     public void queryAll() {
         Logger logger = Logger.getGlobal();
         logger.info("Starting querying process");
+        beforeQuerying();
 
 //        Make sure we are not using parallelism
         indexing = false;
@@ -152,6 +156,7 @@ public abstract class Algorithm {
             }
             long time = System.currentTimeMillis() - lstart;
             queryTimePerQuery[i] = time;
+            System.out.println("Query " + (i + 1) + "/" + queries.length + " took " + time + " ms");
             queryTime += time;
             currQueryId++;
         }

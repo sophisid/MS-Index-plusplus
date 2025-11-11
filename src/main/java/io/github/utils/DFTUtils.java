@@ -456,4 +456,49 @@ public class DFTUtils {
         }
         return querySumOfSquares;
     }
+
+    public static void applyWhitenAndWeight(double[] v) {
+        // No-op αν δεν έχεις ορίσει whitening ή arrays
+        if (!io.github.utils.Parameters.applyWhitening) return;
+        double[] mu  = io.github.utils.Parameters.whitenMean;
+        double[] sig = io.github.utils.Parameters.whitenStd;
+        double[] w   = io.github.utils.Parameters.coeffWeights;
+
+        if (v == null || mu == null || sig == null) return;
+        if (v.length != mu.length || v.length != sig.length) return;
+
+        for (int i = 0; i < v.length; i++) {
+            double z = (sig[i] == 0.0) ? (v[i] - mu[i]) : ((v[i] - mu[i]) / sig[i]);
+            if (w != null && w.length == v.length) z *= w[i];
+            v[i] = z;
+        }
+    }
+
+    /**
+     * Επιστρέφει (meanAbsZ, maxAbsZ) του query ως προς (μ,σ).
+     * Αν λείπουν τα stats ή applyWhitening=false, γυρνάει (0,0) => treated as in-distribution.
+     */
+    public static io.github.utils.Tuple2<Double, Double> oodScore(double[] qFlat) {
+        if (!io.github.utils.Parameters.oodGateEnabled) {
+            return io.github.utils.Tuple2.of(0.0, 0.0);
+        }
+        double[] mu  = io.github.utils.Parameters.whitenMean;
+        double[] sig = io.github.utils.Parameters.whitenStd;
+        if (qFlat == null || mu == null || sig == null) {
+            return io.github.utils.Tuple2.of(0.0, 0.0);
+        }
+        if (qFlat.length != mu.length || qFlat.length != sig.length) {
+            return io.github.utils.Tuple2.of(0.0, 0.0);
+        }
+
+        double sumAbs = 0.0, maxAbs = 0.0;
+        for (int i = 0; i < qFlat.length; i++) {
+            double z = (sig[i] == 0.0) ? (qFlat[i] - mu[i]) : ((qFlat[i] - mu[i]) / sig[i]);
+            double a = Math.abs(z);
+            sumAbs += a;
+            if (a > maxAbs) maxAbs = a;
+        }
+        return io.github.utils.Tuple2.of(sumAbs / qFlat.length, maxAbs);
+    }
+
 }
