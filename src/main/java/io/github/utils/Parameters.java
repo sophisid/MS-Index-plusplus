@@ -55,6 +55,14 @@ public class Parameters {
     public static DimensionWeightingStrategy dimensionWeightingStrategy = DimensionWeightingStrategy.VARIANCE;
     public static boolean queryFromIndexed = true;
     public static int kvMatchSegmentDivisor = 1;
+    // Hybrid-related
+    public static boolean hybridMode = true;
+    public static double hybridSampleFraction = 0.2;
+    public static double hybridMinPruneSample = 0.9;
+    public static int hybridCalibrationQueries = 10;
+
+
+
 
     @Hide
     public static Random random;
