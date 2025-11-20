@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 import itertools
 import subprocess
-import os
 from pathlib import Path
 
 import pandas as pd
@@ -15,9 +14,8 @@ import matplotlib.pyplot as plt
 RUN_EXPERIMENTS = True
 MAKE_PLOTS = True
 
-# ΠΡΟΣΟΧΗ: ο αριθμός των runs μπορεί να γίνει τεράστιος.
-# Βάλε ένα όριο ασφαλείας για να μην τινάξεις το laptop.
-MAX_RUNS = 200  # αύξησέ το αν θες, ή βάλ' το σε None για no-limit
+# Όριο για να μη σκοτώσουμε τον υπολογιστή
+MAX_RUNS = 800  # βάλε None για no-limit (με δική σου ευθύνη)
 
 # Βάση από το bash script σου
 BASE_PARAMS = {
@@ -35,13 +33,13 @@ BASE_PARAMS = {
 
 # Πειραματικοί άξονες
 ALGORITHMS = ["MSINDEX", "MSINDEXPP", "MASS"]
-DATASETS = ["data/synthetic"]
-            #  "data/stocks", "data/weather"]
+DATASETS = ["data/synthetic", "data/stocks", "data/weather"]
 NORMALIZE_VALUES = [False, True]
 NOISE_VALUES = [round(x, 1) for x in [0.1, 0.3, 0.5, 0.7, 0.9]]
 K_VALUES = [1, 5, 10]
-NQUERIES_VALUES = [10, 100]
-                #  1000, 10000, 100000, 1000000, 10000000]
+NQUERIES_VALUES = [10, 100, 500]
+# Αν ποτέ θες παραπάνω:
+# NQUERIES_VALUES = [10, 100, 1000, 10000, 100000, 1000000, 10000000]
 
 
 # ============================================================
@@ -53,7 +51,7 @@ def bool_to_java_str(b: bool) -> str:
 
 
 def run_maven_package():
-    """Τρέχει ένα mvn clean package πριν από όλα τα experiments."""
+    """Τρέχει mvn clean package πριν από όλα τα experiments."""
     print("Running: mvn -q -DskipTests clean package")
     subprocess.run(
         ["mvn", "-q", "-DskipTests", "clean", "package"],
@@ -166,7 +164,7 @@ def run_all_experiments():
 
 
 # ============================================================
-# Plotting
+# CSV loading & compact summary
 # ============================================================
 
 def load_runs_csv(csv_path: Path) -> pd.DataFrame:
@@ -175,8 +173,7 @@ def load_runs_csv(csv_path: Path) -> pd.DataFrame:
 
     df = pd.read_csv(csv_path)
 
-    # Υπολόγισε avgQueryTime αν γίνεται (queryTime / nQueries)
-    # Προσοχή σε μηδενικά ή missing.
+    # avgQueryTime = queryTime / nQueries
     if "queryTime" in df.columns and "nQueries" in df.columns:
         df["avgQueryTime"] = df["queryTime"] / df["nQueries"].replace(0, pd.NA)
     else:
@@ -185,16 +182,48 @@ def load_runs_csv(csv_path: Path) -> pd.DataFrame:
     return df
 
 
+def export_compact_metrics(df: pd.DataFrame, out_path: Path):
+    """
+    Φτιάχνει ένα extra CSV μόνο με τις βασικές μετρήσεις που μας νοιάζουν.
+    """
+    cols_we_want = [
+        "algorithmType",
+        "dataPath",
+        "datasetName",
+        "normalize",
+        "queryNoiseEps",
+        "K",
+        "nQueries",
+        "queryTime",
+        "avgQueryTime",
+        "indexBuildTime",
+        "memoryUsageBeforeIndexing",
+        "memoryUsageAfterIndexing",
+        "indexSize",
+        "N",
+        "channels",
+        "nQueryChannels",
+    ]
+
+    existing_cols = [c for c in cols_we_want if c in df.columns]
+    compact = df[existing_cols].copy()
+
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    compact.to_csv(out_path, index=False)
+    print(f"Saved compact metrics CSV: {out_path}")
+
+
+# ============================================================
+# Plotting
+# ============================================================
+
 def plot_query_time_vs_nqueries(df: pd.DataFrame, out_dir: Path):
     """
     Για κάθε dataset + normalize, plot avgQueryTime vs nQueries για κάθε algorithmType.
     """
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    # Φιλτράρουμε μόνο τα runs που μας ενδιαφέρουν (MSINDEX / MSINDEXPP / MASS)
     df_f = df[df["algorithmType"].isin(ALGORITHMS)].copy()
-
-    # Για ασφάλεια, αφαιρούμε rows χωρίς avgQueryTime
     df_f = df_f.dropna(subset=["avgQueryTime"])
 
     for dataset in df_f["dataPath"].unique():
@@ -211,7 +240,6 @@ def plot_query_time_vs_nqueries(df: pd.DataFrame, out_dir: Path):
                 if sub_alg.empty:
                     continue
 
-                # Sort by nQueries για να μη γίνουν μαντάρα οι γραμμές
                 sub_alg = sub_alg.sort_values("nQueries")
                 plt.plot(
                     sub_alg["nQueries"],
@@ -220,14 +248,15 @@ def plot_query_time_vs_nqueries(df: pd.DataFrame, out_dir: Path):
                     label=alg,
                 )
 
-            plt.xscale("log")  # οι τιμές nQueries είναι 10 -> 1e7
+            plt.xscale("log")
             plt.xlabel("nQueries (log scale)")
             plt.ylabel("avgQueryTime (ms per query)")
             plt.title(f"avgQueryTime vs nQueries\n{dataset}, normalize={norm}")
             plt.legend()
             plt.tight_layout()
 
-            fname = out_dir / f"avgQueryTime_{Path(dataset).name}_norm_{norm}.png"
+            dataset_label = str(dataset)
+            fname = out_dir / f"avgQueryTime_{dataset_label}_norm_{norm}.png"
             plt.savefig(fname, dpi=200)
             plt.close()
             print(f"Saved plot: {fname}")
@@ -235,7 +264,7 @@ def plot_query_time_vs_nqueries(df: pd.DataFrame, out_dir: Path):
 
 def plot_index_time_and_memory(df: pd.DataFrame, out_dir: Path):
     """
-    Κάνει απλά bar plots για indexBuildTime και memoryUsageAfterIndexing
+    Bar plots για indexBuildTime και memoryUsageAfterIndexing
     ανά algorithmType (grouped ανά dataset + normalize).
     """
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -250,7 +279,6 @@ def plot_index_time_and_memory(df: pd.DataFrame, out_dir: Path):
             if sub.empty:
                 continue
 
-            # Για σταθερότητα, κρατάμε π.χ. το μέσο indexBuildTime ανά algorithmType
             agg = sub.groupby("algorithmType").agg({
                 "indexBuildTime": "mean",
                 "memoryUsageAfterIndexing": "mean",
@@ -279,6 +307,63 @@ def plot_index_time_and_memory(df: pd.DataFrame, out_dir: Path):
             print(f"Saved plot: {fname2}")
 
 
+def plot_query_time_vs_noise(df: pd.DataFrame, out_dir: Path):
+    """
+    Για κάθε dataset + normalize:
+    x-axis: queryNoiseEps
+    y-axis: mean avgQueryTime
+    μία γραμμή ανά algorithmType (MSINDEX, MSINDEXPP, MASS).
+    """
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    df_f = df[df["algorithmType"].isin(ALGORITHMS)].copy()
+    df_f = df_f.dropna(subset=["avgQueryTime"])
+
+    grouped = (
+        df_f
+        .groupby(["dataPath", "normalize", "algorithmType", "queryNoiseEps"])
+        .agg(avgQueryTime_mean=("avgQueryTime", "mean"))
+        .reset_index()
+    )
+
+    for dataset in grouped["dataPath"].unique():
+        for norm in grouped["normalize"].unique():
+            sub = grouped[
+                (grouped["dataPath"] == dataset) &
+                (grouped["normalize"] == norm)
+            ]
+            if sub.empty:
+                continue
+
+            plt.figure()
+            for alg in ALGORITHMS:
+                sub_alg = sub[sub["algorithmType"] == alg]
+                if sub_alg.empty:
+                    continue
+
+                sub_alg = sub_alg.sort_values("queryNoiseEps")
+                plt.plot(
+                    sub_alg["queryNoiseEps"],
+                    sub_alg["avgQueryTime_mean"],
+                    marker="o",
+                    label=alg,
+                )
+
+            plt.xlabel("queryNoiseEps")
+            plt.ylabel("avg avgQueryTime (ms per query)")
+            plt.title(
+                f"avgQueryTime vs noise\n"
+                f"{dataset}, normalize={norm}"
+            )
+            plt.legend()
+            plt.tight_layout()
+
+            fname = out_dir / f"avgQueryTime_vs_noise_{Path(dataset).name}_norm_{norm}.png"
+            plt.savefig(fname, dpi=200)
+            plt.close()
+            print(f"Saved plot: {fname}")
+
+
 # ============================================================
 # Main
 # ============================================================
@@ -287,6 +372,7 @@ def main():
     project_root = Path(__file__).resolve().parent
     runs_csv = project_root / "output" / "runs.csv"
     plots_dir = project_root / "plots"
+    summary_csv = project_root / "output" / "summary_metrics.csv"
 
     if RUN_EXPERIMENTS:
         run_all_experiments()
@@ -295,10 +381,14 @@ def main():
         df = load_runs_csv(runs_csv)
         print(f"Loaded {len(df)} rows from {runs_csv}")
 
+        # Extra compact CSV με τις βασικές μετρήσεις
+        export_compact_metrics(df, summary_csv)
+
+        # Plots
         plot_query_time_vs_nqueries(df, plots_dir / "query_time")
         plot_index_time_and_memory(df, plots_dir / "index_and_memory")
+        plot_query_time_vs_noise(df, plots_dir / "noise")
 
 
 if __name__ == "__main__":
     main()
-
