@@ -21,11 +21,10 @@ import static io.github.utils.Parameters.*;
 import static java.util.stream.Collectors.toList;
 
 public class MSIndexPP extends Algorithm {
-    private static final int RC_SERIES_SAMPLES = 8; 
-    private static final int RC_WINDOW_SAMPLES = 16; 
-    private static final double RC_THRESHOLD = 1.06;  
+    private static final int RC_SERIES_SAMPLES = 8;
+    private static final int RC_WINDOW_SAMPLES = 16;
+    private static final double RC_THRESHOLD = 1.06;
     private static final double EPS = 1e-12;
-
 
     private MVMASS massEngine = null;
 
@@ -34,6 +33,37 @@ public class MSIndexPP extends Algorithm {
     private final int treeDimensions = fourierLength();
 
     private boolean buildTree = true;
+
+    // ================== DIAGNOSTICS ==================
+    public static class QueryDiagnostics {
+        public double rcEstimate;
+        public long massTimeNanos;
+        public long msIndexTimeNanos;
+        public long msIndexFirstPassNanos;
+        public long msIndexSecondPassNanos;
+        public boolean decisionUsedMass;
+        public boolean massActuallyFaster;
+        public double leafRC;
+        public int candidatesFromIndex;
+
+        @Override
+        public String toString() {
+            return String.format(Locale.US,
+                    "RC=%.4f, MASS=%.3f ms, MSIndex=%.3f ms (first=%.3f, second=%.3f), " +
+                            "decisionUsedMass=%s, massActuallyFaster=%s, leafRC=%.4f, idxCandidates=%d",
+                    rcEstimate,
+                    massTimeNanos / 1e6,
+                    msIndexTimeNanos / 1e6,
+                    msIndexFirstPassNanos / 1e6,
+                    msIndexSecondPassNanos / 1e6,
+                    decisionUsedMass,
+                    massActuallyFaster,
+                    leafRC,
+                    candidatesFromIndex
+            );
+        }
+    }
+    // ================== END DIAGNOSTICS ==================
 
     public MSIndexPP(boolean buildTree) {
         this.buildTree = buildTree;
@@ -63,9 +93,9 @@ public class MSIndexPP extends Algorithm {
         ) + ".ser";
     }
 
-    private void createTree(List<Entry<CandidateSegment, Geometry>> items){
+    private void createTree(List<Entry<CandidateSegment, Geometry>> items) {
         Logger.getGlobal().info("[MS-Index++] Building the R-tree " + (buildTree ? "[MAIN]" : "[AUX]"));
-        tree = RTree.star().dimensions(treeDimensions).leafSize(buildTree ? indexLeafSize: Integer.MAX_VALUE).create(items);
+        tree = RTree.star().dimensions(treeDimensions).leafSize(buildTree ? indexLeafSize : Integer.MAX_VALUE).create(items);
 
         if (segmentMethod.equals(SegmentMethods.ADHOC)) {
             Logger.getGlobal().info("[MS-Index++] Post-index segmentation");
@@ -82,7 +112,7 @@ public class MSIndexPP extends Algorithm {
     @Override
     public void saveIndex() {
         String filename = getIndexPath();
-        try{
+        try {
             Logger.getGlobal().info("[MS-Index++] Saving the index to file");
             FileOutputStream fileOut = new FileOutputStream(filename);
             ObjectOutputStream out = new ObjectOutputStream(fileOut);
@@ -190,7 +220,6 @@ public class MSIndexPP extends Algorithm {
         return massEngine;
     }
 
-
     public ArrayList<CandidateMVSubsequence> kNN(int k, double[][] query) {
         double rc = estimateRC_viaSamples(query);
         Logger.getGlobal().info(String.format("[MS-Index++] RC estimate: %.5f (thr=%.3f)", rc, RC_THRESHOLD));
@@ -286,4 +315,83 @@ public class MSIndexPP extends Algorithm {
     public double memoryUsage() {
         return recursiveTreeMemoryUsage(tree.root().get()) / 1_000_000d;
     }
+
+    private double computeLeafRelativeContrastFromCandidates(List<CandidateSegment> candidates) {
+        if (candidates == null || candidates.isEmpty()) return 1.0;
+
+        double min = Double.POSITIVE_INFINITY;
+        double max = Double.NEGATIVE_INFINITY;
+
+        for (CandidateSegment seg : candidates) {
+            double d = seg.getCurrLB();
+            if (d < min) min = d;
+            if (d > max) max = d;
+        }
+
+        if (!Double.isFinite(min) || !Double.isFinite(max)) return 1.0;
+        return max / Math.max(min, EPS);
+    }
+
+    public QueryDiagnostics debugCompareMassVsIndex(int k, double[][] query) {
+        QueryDiagnostics diag = new QueryDiagnostics();
+
+        double rc = estimateRC_viaSamples(query);
+        diag.rcEstimate = rc;
+        diag.decisionUsedMass = (rc < RC_THRESHOLD);
+
+        long t0 = System.nanoTime();
+        ArrayList<CandidateMVSubsequence> massRes =
+                new ArrayList<>(getMassEngine().kNN(k, query));
+        long t1 = System.nanoTime();
+        diag.massTimeNanos = t1 - t0;
+
+        final Tuple2<double[], LandmarkPortfolio> queryDFTs =
+                DFTUtils.getQueryDFTs(query, kMeans);
+        final double[] fftQFlat = queryDFTs._1();
+        final LandmarkPortfolio queryPortfolio = queryDFTs._2();
+        final MinimumBoundingRectangle queryMBR =
+                new MinimumBoundingRectangle(
+                        fftQFlat,
+                        fftQFlat,
+                        kMeansClusters == 0 ? null : new LandmarkMBR(queryPortfolio)
+                );
+
+        long tFirst0 = System.nanoTime();
+        final List<CandidateSegment> candidateSegments = closest(queryMBR, k);
+        long tFirst1 = System.nanoTime();
+
+        long tFirst2 = System.nanoTime();
+        ArrayList<CandidateMVSubsequence> initialTopK =
+                postFilter(query, candidateSegments, k, Double.POSITIVE_INFINITY);
+        long tFirst3 = System.nanoTime();
+
+        double kThDistance = initialTopK.get(k - 1).totalDistance;
+        long firstPassTime = (tFirst1 - tFirst0) + (tFirst3 - tFirst2);
+        diag.msIndexFirstPassNanos = firstPassTime;
+
+        long tSecond0 = System.nanoTime();
+        final Iterable<Entry<CandidateSegment, Geometry>> finalCandidatesIter =
+                tree.search(queryMBR, new RunningThreshold(kThDistance));
+        final List<CandidateSegment> finalCandidatesList =
+                lib.getStream(finalCandidatesIter).map(Entry::value).collect(toList());
+        long tSecond1 = System.nanoTime();
+
+        long tSecond2 = System.nanoTime();
+        ArrayList<CandidateMVSubsequence> finalTopK =
+                postFilter(query, finalCandidatesList, k, kThDistance);
+        long tSecond3 = System.nanoTime();
+
+        long secondPassTime = (tSecond1 - tSecond0) + (tSecond3 - tSecond2);
+        diag.msIndexSecondPassNanos = secondPassTime;
+        diag.msIndexTimeNanos = firstPassTime + secondPassTime;
+        diag.candidatesFromIndex = finalCandidatesList.size();
+
+        diag.massActuallyFaster = diag.massTimeNanos < diag.msIndexTimeNanos;
+
+        diag.leafRC = computeLeafRelativeContrastFromCandidates(finalCandidatesList);
+
+        Logger.getGlobal().info("[MS-Index++] Diagnostics: " + diag);
+        return diag;
+    }
+
 }

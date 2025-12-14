@@ -7,6 +7,8 @@ import io.github.utils.CandidateSegment;
 import io.github.utils.DFTUtils;
 import io.github.utils.lib;
 import pl.edu.icm.jlargearrays.ConcurrencyUtils;
+// import io.github.algorithms.msindexpp;
+
 
 import java.io.File;
 import java.util.ArrayList;
@@ -15,6 +17,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.PriorityBlockingQueue;
 import java.util.logging.Logger;
+import java.io.PrintWriter;
+import java.util.Locale;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+
 
 import static io.github.utils.Parameters.*;
 
@@ -130,13 +137,49 @@ public abstract class Algorithm {
         //        Query all and print results
         double[][][] queries = DataManager.queries;
         queryTimePerQuery = new long[queries.length];
+        PrintWriter diagWriter = null;
+        String diagFilename = null;
+        try {
+            String timestamp = new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date());
+            // experimentId είναι ήδη static import από Parameters
+            diagFilename = String.format("msindexpp_diagnostics_exp%d_%s.csv", experimentId, timestamp);
+
+            diagWriter = new PrintWriter(diagFilename);
+            diagWriter.println("query_id,rc_estimate,mass_ms,msindex_ms,msindex_first_ms,msindex_second_ms," +
+                            "decision_used_mass,mass_actually_faster,leaf_rc,index_candidates");
+
+            Logger.getGlobal().info("Writing MSINDEX++ diagnostics to: " + new File(diagFilename).getAbsolutePath());
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
 
         for (int i = 0; i < queries.length; i++) {
             long lstart = System.currentTimeMillis();
             logger.info(String.format("Querying %d/%d", i, queries.length));
+
+            if (algorithmType == AlgorithmType.MSINDEXPP && this instanceof io.github.algorithms.msindexpp.MSIndexPP) {
+                io.github.algorithms.msindexpp.MSIndexPP ms = (io.github.algorithms.msindexpp.MSIndexPP) this;
+                io.github.algorithms.msindexpp.MSIndexPP.QueryDiagnostics diag = ms.debugCompareMassVsIndex(K, queries[i]);
+                Logger.getGlobal().info(String.format("[MS-Index++ DIAG q=%d] %s", i, diag.toString()));
+                if (diagWriter != null) {
+                    diagWriter.printf(Locale.US,
+                            "%d,%.6f,%.4f,%.4f,%.4f,%.4f,%s,%s,%.6f,%d\n",
+                            i,
+                            diag.rcEstimate,
+                            diag.massTimeNanos / 1e6,
+                            diag.msIndexTimeNanos / 1e6,
+                            diag.msIndexFirstPassNanos / 1e6,
+                            diag.msIndexSecondPassNanos / 1e6,
+                            diag.decisionUsedMass,
+                            diag.massActuallyFaster,
+                            diag.leafRC,
+                            diag.candidatesFromIndex
+                    );
+                }
+            }
+
             final List<CandidateMVSubsequence> results = kNN(K, queries[i]);
             if (printResults) {
-//                Sort results by distance
                 results.sort(Comparator.comparingDouble(CandidateMVSubsequence::totalDistance));
                 logger.info(String.format("Results for query %d/%d: ", i, queries.length) + results.toString());
             }
@@ -155,6 +198,11 @@ public abstract class Algorithm {
             queryTime += time;
             currQueryId++;
         }
+        if (diagWriter != null) {
+            diagWriter.close();
+        }
+
+
     }
 
     public abstract List<CandidateMVSubsequence> kNN(int k, double[][] query);

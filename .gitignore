@@ -162,3 +162,9 @@ data/weather/*
 index_caches/*
 
 output/runs.csv
+no_norm-*
+norm-*
+exp_rename.sh
+merge.py
+output_exp.out
+MSINDEXPP_DIAGNOSTICS_ALL.xlsx
