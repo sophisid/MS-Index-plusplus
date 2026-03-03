@@ -1,11 +1,6 @@
 package io.github.utils;
 
 import com.google.common.util.concurrent.AtomicDouble;
-import lombok.Getter;
-import lombok.NonNull;
-import lombok.RequiredArgsConstructor;
-
-import java.util.logging.Logger;
 
 public class RunningThreshold {
     public AtomicDouble threshold;

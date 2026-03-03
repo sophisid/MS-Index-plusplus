@@ -2,8 +2,6 @@ package io.github.algorithms.dstree_org;
 
 import de.ruedigermoeller.serialization.FSTObjectInput;
 import de.ruedigermoeller.serialization.FSTObjectOutput;
-import lombok.Getter;
-import lombok.Setter;
 import io.github.algorithms.dstree_org.util.CalcUtil;
 import io.github.utils.CandidateSubsequence;
 
@@ -23,10 +21,8 @@ public class Node implements Serializable {
 
     private int dimension;
 
-    @Setter
     transient INodeSegmentSplitPolicy[] nodeSegmentSplitPolicies;
 
-    @Setter
     transient IRange range;
 
     SplitPolicy splitPolicy;
@@ -35,10 +31,7 @@ public class Node implements Serializable {
     NodeSegmentSketch[] nodeSegmentSketches;
     transient NodeSegmentSketch[] hsNodeSegmentSketches; //for horizontal splitting
 
-    @Setter
-    @Getter
     transient ISeriesSegmentSketcher seriesSegmentSketcher; //= new MeanStdevSeriesSegmentSketcher();
-    @Setter
     transient INodeSegmentSketchUpdater nodeSegmentSketchUpdater;// = new MeanStdevNodeSegmentSketchUpdater(seriesSegmentSketcher);
 
     Node parent;
@@ -49,13 +42,11 @@ public class Node implements Serializable {
     boolean isLeft;
 
     transient int threshold;
-    @Getter
     int size = 0;
 
     Node left;
     Node right;
 
-    @Getter
     ArrayList<CandidateSubsequence> candidateSubsequenceList = new ArrayList<>();
 
     public static int maxSegmentLength = 2;
@@ -133,7 +124,6 @@ public class Node implements Serializable {
 
     public static double hsTradeOffFactor = 2;
 
-    @Getter
     List<double[]> tss = new ArrayList<>();
 
     public void insert(CandidateSubsequence candidateSubsequence) throws IOException {
@@ -351,5 +341,37 @@ public class Node implements Serializable {
         }
         in.close();
         return node;
+    }
+
+    public void setNodeSegmentSplitPolicies(INodeSegmentSplitPolicy[] nodeSegmentSplitPolicies) {
+        this.nodeSegmentSplitPolicies = nodeSegmentSplitPolicies;
+    }
+
+    public void setRange(IRange range) {
+        this.range = range;
+    }
+
+    public ISeriesSegmentSketcher getSeriesSegmentSketcher() {
+        return seriesSegmentSketcher;
+    }
+
+    public void setSeriesSegmentSketcher(ISeriesSegmentSketcher seriesSegmentSketcher) {
+        this.seriesSegmentSketcher = seriesSegmentSketcher;
+    }
+
+    public void setNodeSegmentSketchUpdater(INodeSegmentSketchUpdater nodeSegmentSketchUpdater) {
+        this.nodeSegmentSketchUpdater = nodeSegmentSketchUpdater;
+    }
+
+    public int getSize() {
+        return size;
+    }
+
+    public ArrayList<CandidateSubsequence> getCandidateSubsequenceList() {
+        return candidateSubsequenceList;
+    }
+
+    public List<double[]> getTss() {
+        return tss;
     }
 }

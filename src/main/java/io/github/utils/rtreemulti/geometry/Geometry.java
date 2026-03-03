@@ -1,6 +1,6 @@
 package io.github.utils.rtreemulti.geometry;
 
-import io.github.algorithms.msindex.MinimumBoundingRectangle;
+import io.github.algorithms.msindexshared.MinimumBoundingRectangle;
 
 import java.io.Serializable;
 

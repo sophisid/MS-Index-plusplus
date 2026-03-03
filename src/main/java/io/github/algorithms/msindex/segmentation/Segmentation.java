@@ -3,6 +3,7 @@ package io.github.algorithms.msindex.segmentation;
 import io.github.utils.*;
 import io.github.utils.rtreemulti.Entry;
 import io.github.algorithms.msindex.MinimumBoundingRectangle;
+import io.github.algorithms.msindexshared.segmentation.SegmentMethods;
 import io.github.utils.rtreemulti.geometry.Geometry;
 
 import java.util.Arrays;

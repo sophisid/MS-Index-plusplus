@@ -1,6 +1,6 @@
 package io.github.utils.rtreemulti.geometry.internal;
 
-import io.github.algorithms.msindex.MinimumBoundingRectangle;
+import io.github.algorithms.msindexshared.MinimumBoundingRectangle;
 import io.github.utils.rtreemulti.geometry.Geometry;
 import io.github.utils.rtreemulti.geometry.Point;
 import io.github.utils.rtreemulti.geometry.Rectangle;

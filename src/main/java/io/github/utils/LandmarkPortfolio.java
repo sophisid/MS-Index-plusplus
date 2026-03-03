@@ -1,14 +1,11 @@
 package io.github.utils;
 
-import lombok.Getter;
-import lombok.NonNull;
-
 import java.io.Serializable;
 
 public class LandmarkPortfolio implements Serializable {
 
-    @NonNull @Getter private final double[][] landmarkDistances; // shape: [dimensions][nrLandmarks]
-    @Getter private final int[] closestLandmarks; // shape: [dimensions]
+    private final double[][] landmarkDistances; // shape: [dimensions][nrLandmarks]
+    private final int[] closestLandmarks; // shape: [dimensions]
     private double[] closestDistances = null;
 
     public LandmarkPortfolio(double[][] landmarkDistances) {
@@ -19,6 +16,14 @@ public class LandmarkPortfolio implements Serializable {
         for (int i = 0; i < landmarkDistances.length; i++) {
             this.closestLandmarks[i] = lib.argmin(landmarkDistances[i]);
         }
+    }
+
+    public double[][] getLandmarkDistances() {
+        return landmarkDistances;
+    }
+
+    public int[] getClosestLandmarks() {
+        return closestLandmarks;
     }
 
     public double[] getDistances(int dimension) {

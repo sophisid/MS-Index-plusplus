@@ -1,6 +1,5 @@
 package io.github.algorithms;
 
-import lombok.RequiredArgsConstructor;
 import io.github.io.DataManager;
 import io.github.utils.CandidateMVSubsequence;
 import io.github.utils.CandidateSegment;
@@ -18,7 +17,6 @@ import java.util.logging.Logger;
 
 import static io.github.utils.Parameters.*;
 
-@RequiredArgsConstructor
 public abstract class Algorithm {
 
     public void run() {

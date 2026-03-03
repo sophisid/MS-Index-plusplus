@@ -1,8 +1,5 @@
 package io.github.algorithms.dstree_org;
 
-import lombok.Getter;
-import lombok.Setter;
-
 import java.io.Serializable;
 
 /**
@@ -15,15 +12,11 @@ import java.io.Serializable;
 public class SplitPolicy implements Serializable {
     short splitFrom;    // segment start point
     short splitTo;      // segment end point
-    @Setter
-    @Getter
     INodeSegmentSplitPolicy nodeSegmentSplitPolicy;     // segment split policy
 
     int indicatorIdx;   // 0 for mean, 1 for stdev. Choose a metric to split certain segment
     double indicatorSplitValue;     //  The specific value for the metric to splie
 
-    @Setter
-    @Getter
     ISeriesSegmentSketcher seriesSegmentSketcher;   // describe a segment by some indicators(metrics)
 
     boolean routeToLeft(double[] series) {
@@ -34,5 +27,21 @@ public class SplitPolicy implements Serializable {
     @Override
     public String toString() {
         return "from:" + splitFrom + " to:" + splitTo + " value:" + indicatorSplitValue + " name:" + nodeSegmentSplitPolicy.getClass().getSimpleName();
+    }
+
+    public INodeSegmentSplitPolicy getNodeSegmentSplitPolicy() {
+        return nodeSegmentSplitPolicy;
+    }
+
+    public void setNodeSegmentSplitPolicy(INodeSegmentSplitPolicy nodeSegmentSplitPolicy) {
+        this.nodeSegmentSplitPolicy = nodeSegmentSplitPolicy;
+    }
+
+    public ISeriesSegmentSketcher getSeriesSegmentSketcher() {
+        return seriesSegmentSketcher;
+    }
+
+    public void setSeriesSegmentSketcher(ISeriesSegmentSketcher seriesSegmentSketcher) {
+        this.seriesSegmentSketcher = seriesSegmentSketcher;
     }
 }

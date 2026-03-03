@@ -1,9 +1,4 @@
 package io.github.utils;
-
-
-import lombok.Getter;
-import lombok.NonNull;
-import lombok.Setter;
 import io.github.io.DataManager;
 
 import java.util.Comparator;
@@ -12,21 +7,18 @@ import static io.github.io.DataManager.timeSeriesStarts;
 import static io.github.utils.Parameters.qLen;
 
 public class CandidateMVSubsequence {
-    @Getter
     public final int timeSeriesIndex;
-    @Getter
     public final int subSequenceIndex;
     public double totalDistance = Double.MAX_VALUE;
 
-    @Getter @Setter
     public double[] dimDistances;
 
-    public CandidateMVSubsequence(@NonNull int timeSeriesIndex, @NonNull int subSequenceIndex) {
+    public CandidateMVSubsequence(int timeSeriesIndex, int subSequenceIndex) {
         this.timeSeriesIndex = timeSeriesIndex;
         this.subSequenceIndex = subSequenceIndex;
     }
 
-    public CandidateMVSubsequence(@NonNull int timeSeriesIndex, @NonNull int subSequenceIndex, @NonNull double totalDistance) {
+    public CandidateMVSubsequence(int timeSeriesIndex, int subSequenceIndex, double totalDistance) {
         this.timeSeriesIndex = timeSeriesIndex;
         this.subSequenceIndex = subSequenceIndex;
         this.totalDistance = totalDistance;
@@ -90,6 +82,22 @@ public class CandidateMVSubsequence {
             dimDistances = new double[Parameters.channels];
         }
         dimDistances[dimension] = distance;
+    }
+
+    public int getTimeSeriesIndex() {
+        return timeSeriesIndex;
+    }
+
+    public int getSubSequenceIndex() {
+        return subSequenceIndex;
+    }
+
+    public double[] getDimDistances() {
+        return dimDistances;
+    }
+
+    public void setDimDistances(double[] dimDistances) {
+        this.dimDistances = dimDistances;
     }
 
 }

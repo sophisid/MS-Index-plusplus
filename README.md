@@ -13,7 +13,7 @@ To change the parameters, modify the [run.sh]() script.
 
 ## Parameters
 The parameters in the `run.sh` script are as follows:
-- `algorithmType`: The type of algorithm to use (MSINDEX, BRUTE_FORCE, MASS, ST_INDEX, DSTREE, default: MSINDEX)
+- `algorithmType`: The type of algorithm to use (MSINDEX, MSINDEXPP, BRUTE_FORCE, MASS, ST_INDEX, DSTREE, default: MSINDEX)
 - `dataPath`: Path to the data directory (default: data/synthetic)
 - `N`: Number of time series to read from the dataset (default: 100)
 - `channels`: Number of channels to read for each time series (-1 means all channels, default: -1)

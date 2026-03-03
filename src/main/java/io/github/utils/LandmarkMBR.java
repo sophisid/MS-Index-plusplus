@@ -1,6 +1,5 @@
 package io.github.utils;
 
-import lombok.Setter;
 import org.apache.commons.math3.util.FastMath;
 
 import java.io.DataInputStream;
@@ -18,7 +17,7 @@ public class LandmarkMBR implements Serializable {
     final double[][] minDistances; // shape: [dimensions, #landmarks]
     final double[][] maxDistances; // shape: [dimensions, #landmarks]
     final int[] chosenLandmarks;
-    @Setter LandmarkPortfolio leafPortfolio;
+    LandmarkPortfolio leafPortfolio;
 
     public LandmarkMBR(LandmarkPortfolio portfolio){
         minDistances = portfolio.getLandmarkDistances();
@@ -182,6 +181,10 @@ public class LandmarkMBR implements Serializable {
             }
             stream.writeInt(chosenLandmarks[i]);
         }
+    }
+
+    public void setLeafPortfolio(LandmarkPortfolio leafPortfolio) {
+        this.leafPortfolio = leafPortfolio;
     }
 
 

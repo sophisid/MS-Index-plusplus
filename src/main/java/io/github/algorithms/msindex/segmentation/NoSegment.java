@@ -1,8 +1,6 @@
 package io.github.algorithms.msindex.segmentation;
 
 import io.github.utils.*;
-import lombok.Builder;
-import lombok.NonNull;
 import io.github.algorithms.msindex.MinimumBoundingRectangle;
 import io.github.utils.rtreemulti.Entry;
 import io.github.utils.rtreemulti.geometry.Geometry;
@@ -10,9 +8,12 @@ import io.github.utils.rtreemulti.geometry.Geometry;
 import java.util.Collections;
 import java.util.List;
 
-@Builder
 public class NoSegment extends Segmentation {
-    @NonNull private boolean withMBR;
+    private final boolean withMBR;
+
+    public NoSegment(boolean withMBR) {
+        this.withMBR = withMBR;
+    }
 
     /**
      * Singleton segmentation of the time series. Used to be equi-depth with volume 0 but this is optimized for this case.

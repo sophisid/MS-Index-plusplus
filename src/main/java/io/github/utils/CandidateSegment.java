@@ -1,7 +1,6 @@
 package io.github.utils;
 
-import lombok.Getter;
-import io.github.algorithms.msindex.MinimumBoundingRectangle;
+import io.github.algorithms.msindexshared.MinimumBoundingRectangle;
 import org.apache.commons.math3.util.FastMath;
 
 import java.io.Serializable;
@@ -14,7 +13,6 @@ import java.util.stream.Collectors;
 import static java.util.stream.Collectors.toMap;
 import static io.github.utils.Parameters.*;
 
-@Getter
 public class CandidateSegment implements Serializable {
     private final int timeSeriesIndex;
     private final Range segmentRange;
@@ -145,5 +143,17 @@ public class CandidateSegment implements Serializable {
 
     public boolean contains(int timeSeriesIndex, int segmentId) {
         return this.timeSeriesIndex == timeSeriesIndex && this.segmentRange.getStart() <= segmentId && this.segmentRange.getEnd() >= segmentId;
+    }
+
+    public int getTimeSeriesIndex() {
+        return timeSeriesIndex;
+    }
+
+    public Range getSegmentRange() {
+        return segmentRange;
+    }
+
+    public MinimumBoundingRectangle getMbr() {
+        return mbr;
     }
 };

@@ -21,7 +21,7 @@ public class AdhocSegment extends Segmentation {
         fourierTrails[idx] = fourierTrail;
 
 //        Run nosegment without MBR creation
-        return SingletonSegment.builder().withMBR(false).build().segment(idx, fourierTrail);
+        return new SingletonSegment(false).segment(idx, fourierTrail);
     }
 
 

@@ -3,7 +3,6 @@ package io.github.algorithms.dstree_org;
 import io.github.utils.CandidateMVSubsequence;
 import io.github.utils.CandidateSegment;
 import io.github.utils.lib;
-import lombok.Getter;
 import io.github.algorithms.Algorithm;
 import io.github.algorithms.BaselineWrapper;
 import io.github.utils.CandidateSubsequence;
@@ -18,7 +17,6 @@ import static io.github.utils.Parameters.*;
 
 
 public class MVDSTreeOrg extends BaselineWrapper implements Serializable {
-    @Getter
     public DSTreeOrg[] indices;
 
     public MVDSTreeOrg() {
@@ -100,5 +98,9 @@ public class MVDSTreeOrg extends BaselineWrapper implements Serializable {
             totalSize += index.memoryUsage();
         }
         return totalSize;
+    }
+
+    public DSTreeOrg[] getIndices() {
+        return indices;
     }
 }

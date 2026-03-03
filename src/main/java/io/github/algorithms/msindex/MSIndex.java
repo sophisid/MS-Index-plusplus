@@ -1,9 +1,10 @@
 package io.github.algorithms.msindex;
 
 import io.github.algorithms.Algorithm;
+import io.github.algorithms.msindexshared.BoundedPriorityQueue;
+import io.github.algorithms.msindexshared.segmentation.SegmentMethods;
 import io.github.utils.KMeans;
 import io.github.algorithms.msindex.segmentation.AdhocSegment;
-import io.github.algorithms.msindex.segmentation.SegmentMethods;
 import io.github.utils.*;
 import io.github.utils.rtreemulti.Entry;
 import io.github.utils.rtreemulti.Node;

@@ -15,20 +15,21 @@
  */
 package io.github.algorithms.kvmatch.common;
 
-import lombok.Getter;
-
 /**
  * Disjoint windows of query series
  * <p>
  * Created by Jiaye Wu on 16-8-9.
  */
-@Getter
 public class QuerySegment {
 
     private final double mean;
 
     public QuerySegment(double mean) {
         this.mean = mean;
+    }
+
+    public double getMean() {
+        return mean;
     }
 
     @Override

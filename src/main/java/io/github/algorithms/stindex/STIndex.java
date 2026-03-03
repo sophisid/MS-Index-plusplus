@@ -1,6 +1,6 @@
 package io.github.algorithms.stindex;
 
-import io.github.algorithms.msindex.BoundedPriorityQueue;
+import io.github.algorithms.msindexshared.BoundedPriorityQueue;
 import io.github.utils.*;
 import com.github.davidmoten.rtreemulti.Entry;
 import com.github.davidmoten.rtreemulti.Node;

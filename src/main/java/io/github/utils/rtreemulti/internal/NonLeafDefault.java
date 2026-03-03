@@ -1,7 +1,7 @@
 package io.github.utils.rtreemulti.internal;
 
 import com.github.davidmoten.guavamini.Preconditions;
-import io.github.algorithms.msindex.MinimumBoundingRectangle;
+import io.github.algorithms.msindexshared.MinimumBoundingRectangle;
 import io.github.utils.rtreemulti.Context;
 import io.github.utils.rtreemulti.Entry;
 import io.github.utils.rtreemulti.Node;

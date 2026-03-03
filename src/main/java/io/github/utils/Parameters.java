@@ -4,8 +4,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import io.github.algorithms.AlgorithmType;
-import io.github.algorithms.msindex.DimensionWeightingStrategy;
-import io.github.algorithms.msindex.segmentation.SegmentMethods;
+import io.github.algorithms.msindexshared.DimensionWeightingStrategy;
+import io.github.algorithms.msindexshared.segmentation.SegmentMethods;
 import org.jtransforms.fft.DoubleFFT_1D;
 
 import java.io.File;
@@ -134,7 +134,7 @@ public class Parameters {
 
 
 //        FFT config (only for fft-based algorithms
-        if (Arrays.asList(AlgorithmType.ST_INDEX, AlgorithmType.MSINDEX).contains(algorithmType)) {
+        if (Arrays.asList(AlgorithmType.ST_INDEX, AlgorithmType.MSINDEX, AlgorithmType.MSINDEXPP).contains(algorithmType)) {
             setFFTConfig(fftConfigPath);
         }
 
@@ -146,7 +146,7 @@ public class Parameters {
         if (!algorithmType.equals(AlgorithmType.BRUTE_FORCE)) {
             setPrecomputedFFTs();
         }
-        if (Arrays.asList(AlgorithmType.ST_INDEX,AlgorithmType.MSINDEX).contains(algorithmType)) {
+        if (Arrays.asList(AlgorithmType.ST_INDEX, AlgorithmType.MSINDEX, AlgorithmType.MSINDEXPP).contains(algorithmType)) {
             setPrecomputedAngles();
         }
     }
@@ -278,7 +278,7 @@ public class Parameters {
     }
 
     public static void setLeafSize(long nSubsequences, double percentage) {
-        if (algorithmType.equals(AlgorithmType.MSINDEX)){
+        if (Arrays.asList(AlgorithmType.MSINDEX, AlgorithmType.MSINDEXPP).contains(algorithmType)) {
             indexLeafSize = percentage == 0 ? 4: (int) Math.round(nSubsequences * percentage);
         } else {
             switch (algorithmType) {

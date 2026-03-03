@@ -1,9 +1,5 @@
 package io.github.utils;
 
-import lombok.*;
-
-@Setter
-@Getter
 public class FourierTrail {
     private double[][] trail;
 
@@ -16,5 +12,21 @@ public class FourierTrail {
 
     public int getLength() {
         return trail.length;
+    }
+
+    public double[][] getTrail() {
+        return trail;
+    }
+
+    public void setTrail(double[][] trail) {
+        this.trail = trail;
+    }
+
+    public LandmarkPortfolio[] getLandmarkPortfolios() {
+        return landmarkPortfolios;
+    }
+
+    public void setLandmarkPortfolios(LandmarkPortfolio[] landmarkPortfolios) {
+        this.landmarkPortfolios = landmarkPortfolios;
     }
 }

@@ -1,7 +1,5 @@
 package io.github.algorithms.msindex.segmentation;
 
-import lombok.Builder;
-import lombok.NonNull;
 import io.github.algorithms.msindex.MinimumBoundingRectangle;
 import io.github.utils.CandidateSegment;
 import io.github.utils.FourierTrail;
@@ -14,9 +12,12 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-@Builder
 public class SingletonSegment extends Segmentation {
-    @NonNull private boolean withMBR;
+    private final boolean withMBR;
+
+    public SingletonSegment(boolean withMBR) {
+        this.withMBR = withMBR;
+    }
 
     /**
      * Singleton segmentation of the time series. Used to be equi-depth with volume 0 but this is optimized for this case.

@@ -1,7 +1,7 @@
 package io.github.utils;
 
-import io.github.algorithms.msindex.segmentation.SegmentMethods;
-import io.github.algorithms.msindex.segmentation.Segmentation;
+import io.github.algorithms.AlgorithmType;
+import io.github.algorithms.msindexshared.segmentation.SegmentMethods;
 import io.github.io.DataManager;
 import io.github.utils.rtreemulti.Entry;
 import io.github.utils.rtreemulti.geometry.Geometry;
@@ -148,7 +148,16 @@ public class DFTUtils {
         return lib.getStream(IntStream.range(0, N).boxed())
                 .flatMap(i -> {
                     FourierTrail fourierTrail = DFTUtils.getFourierTrail(i, kMeans);
-                    List<Entry<CandidateSegment, Geometry>> segments = Segmentation.get(segmentMethod).segment(i, fourierTrail);
+                    List<Entry<CandidateSegment, Geometry>> segments;
+                    if (algorithmType == AlgorithmType.MSINDEXPP) {
+                        segments = io.github.algorithms.msindexpp.segmentation.Segmentation
+                                .get(io.github.algorithms.msindexshared.segmentation.SegmentMethods.valueOf(segmentMethod.name()))
+                                .segment(i, fourierTrail);
+                    } else {
+                        segments = io.github.algorithms.msindex.segmentation.Segmentation
+                                .get(io.github.algorithms.msindexshared.segmentation.SegmentMethods.valueOf(segmentMethod.name()))
+                                .segment(i, fourierTrail);
+                    }
 
 //                    Update stats
                     if (segmentMethod != SegmentMethods.ADHOC) {

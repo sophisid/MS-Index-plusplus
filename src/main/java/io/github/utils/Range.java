@@ -1,22 +1,35 @@
 package io.github.utils;
 
-import lombok.Getter;
-import lombok.NonNull;
-import lombok.RequiredArgsConstructor;
-import lombok.Setter;
-
 import java.io.Serializable;
 import java.util.List;
 
 import static io.github.utils.Parameters.qLen;
 
-@RequiredArgsConstructor
 public class Range implements Serializable {
-    @NonNull @Getter @Setter
     private int start;
 
-    @NonNull @Getter @Setter
     private int end;
+
+    public Range(int start, int end) {
+        this.start = start;
+        this.end = end;
+    }
+
+    public int getStart() {
+        return start;
+    }
+
+    public void setStart(int start) {
+        this.start = start;
+    }
+
+    public int getEnd() {
+        return end;
+    }
+
+    public void setEnd(int end) {
+        this.end = end;
+    }
 
     public Tuple2<List<Range>, Double> optimalPlan;
 

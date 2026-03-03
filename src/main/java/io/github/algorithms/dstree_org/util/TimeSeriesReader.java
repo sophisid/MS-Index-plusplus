@@ -1,7 +1,5 @@
 package io.github.algorithms.dstree_org.util;
 
-import lombok.Getter;
-
 import java.io.*;
 
 /**
@@ -13,7 +11,6 @@ import java.io.*;
  */
 public class TimeSeriesReader {
     BufferedReader bfr;
-    @Getter
     String fileName;
 
     public TimeSeriesReader(String fileName) {
@@ -75,6 +72,10 @@ public class TimeSeriesReader {
 
     public void close() throws IOException {
         bfr.close();
+    }
+
+    public String getFileName() {
+        return fileName;
     }
 
 

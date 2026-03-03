@@ -1,8 +1,5 @@
 package io.github.algorithms.dstree_org;
 
-import lombok.Getter;
-import lombok.Setter;
-
 import java.io.IOException;
 import java.util.*;
 
@@ -15,8 +12,6 @@ import java.util.*;
  */
 public class FileBufferManager {
     private long maxBufferedSize = 1000 * 1000 * 100; //
-    @Setter
-    @Getter
     private int threshold;   //use to calc the priority  of remove
     int tsLength;
     int ioWrite = 0;
@@ -113,4 +108,12 @@ public class FileBufferManager {
     }
 
 //    public
+
+    public int getThreshold() {
+        return threshold;
+    }
+
+    public void setThreshold(int threshold) {
+        this.threshold = threshold;
+    }
 }

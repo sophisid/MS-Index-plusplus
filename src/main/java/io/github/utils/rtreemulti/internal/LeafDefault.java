@@ -1,7 +1,6 @@
 package io.github.utils.rtreemulti.internal;
 
-import lombok.Setter;
-import io.github.algorithms.msindex.MinimumBoundingRectangle;
+import io.github.algorithms.msindexshared.MinimumBoundingRectangle;
 import io.github.utils.rtreemulti.Context;
 import io.github.utils.rtreemulti.Entry;
 import io.github.utils.rtreemulti.Leaf;
@@ -13,7 +12,7 @@ import java.util.List;
 
 public final class LeafDefault<T extends Serializable, S extends Geometry> implements Leaf<T, S> {
 
-    @Setter private List<Entry<T, S>> entries;
+    private List<Entry<T, S>> entries;
     private final MinimumBoundingRectangle mbr;
     private final Context<T, S> context;
 
@@ -61,6 +60,10 @@ public final class LeafDefault<T extends Serializable, S extends Geometry> imple
     @Override
     public String toString() {
         return "LeafDefault [mbr=" + mbr + ", entries=" + entries + "]";
+    }
+
+    public void setEntries(List<Entry<T, S>> entries) {
+        this.entries = entries;
     }
 
 }
