@@ -1,204 +1,320 @@
 package io.github.algorithms.msindexpp;
 
 import io.github.algorithms.Algorithm;
-import io.github.algorithms.msindexshared.BoundedPriorityQueue;
-import io.github.algorithms.msindexshared.segmentation.SegmentMethods;
-import io.github.algorithms.msindexpp.MinimumBoundingRectangle;
-import io.github.algorithms.msindexpp.segmentation.AdhocSegment;
+import io.github.algorithms.AlgorithmType;
+import io.github.algorithms.mass.MVMASS;
+import io.github.algorithms.msindex.MSIndex;
+import io.github.algorithms.msindexpp.decision.DecisionEvaluationCsvWriter;
+import io.github.algorithms.msindexpp.decision.DecisionFeatureVector;
+import io.github.algorithms.msindexpp.decision.DecisionTrainingCsvWriter;
+import io.github.algorithms.msindexpp.decision.GradientBoostedDecisionModel;
+import io.github.algorithms.msindexpp.decision.QueryDecisionFeatureExtractor;
+import io.github.io.DataManager;
 import io.github.utils.CandidateMVSubsequence;
-import io.github.utils.CandidateSegment;
-import io.github.utils.DFTUtils;
-import io.github.utils.KMeans;
-import io.github.utils.LandmarkMBR;
-import io.github.utils.LandmarkPortfolio;
-import io.github.utils.RunningThreshold;
-import io.github.utils.Tuple2;
-import io.github.utils.lib;
-import io.github.utils.rtreemulti.Entry;
-import io.github.utils.rtreemulti.Node;
-import io.github.utils.rtreemulti.RTree;
-import io.github.utils.rtreemulti.geometry.Geometry;
-import io.github.utils.rtreemulti.internal.LeafDefault;
-import io.github.utils.rtreemulti.internal.NonLeafDefault;
+import pl.edu.icm.jlargearrays.ConcurrencyUtils;
 
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
-import java.util.ArrayList;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Comparator;
 import java.util.List;
 import java.util.logging.Logger;
 
-import static io.github.utils.Parameters.*;
-import static java.util.stream.Collectors.toList;
+import static io.github.utils.Parameters.K;
+import static io.github.utils.Parameters.currQueryId;
+import static io.github.utils.Parameters.indexing;
+import static io.github.utils.Parameters.parallel;
+import static io.github.utils.Parameters.printResults;
+import static io.github.utils.Parameters.queryTime;
+import static io.github.utils.Parameters.queryTimePerQuery;
 
 public class MSIndexPP extends Algorithm {
-    final KMeans[] kMeans = new KMeans[channels];
-    RTree<CandidateSegment, Geometry> tree;
-    private final int treeDimensions = fourierLength();
+    private static final String TRAINING_CSV_PROPERTY = "msindexpp.trainingCsv";
+    private static final String EVALUATION_CSV_PROPERTY = "msindexpp.evaluationCsv";
+    private static final String MODEL_PATH_PROPERTY = "msindexpp.modelPath";
+    private static final String DEFAULT_MODEL_PATH = "output/msindexpp_gbdt_model.json";
 
-    private boolean buildTree = true;
+    private final boolean trainingMode;
+    private final Path trainingCsvPath;
+    private final boolean evaluationMode;
+    private final Path evaluationCsvPath;
+    private final Path modelPath;
 
-    public MSIndexPP(boolean buildTree) {
-        this.buildTree = buildTree;
+    private MSIndex msIndex;
+    private MVMASS mass;
+    private QueryDecisionFeatureExtractor featureExtractor;
+    private GradientBoostedDecisionModel decisionModel;
+    private long evaluationQueries;
+    private long correctPredictions;
+    private long predictedMassCount;
+    private long predictedMsIndexCount;
+    private long actualMassCount;
+    private long actualMsIndexCount;
+    private long totalFeatureExtractionTimeMs;
+    private long totalDecisionTimeMs;
 
-        DFTUtils.computeKMeansClusters(kMeans);
+    public MSIndexPP(boolean ignoredBuildTree) {
+        final String trainingCsv = System.getProperty(TRAINING_CSV_PROPERTY, "").trim();
+        final String evaluationCsv = System.getProperty(EVALUATION_CSV_PROPERTY, "").trim();
+        final String configuredModelPath = System.getProperty(MODEL_PATH_PROPERTY, DEFAULT_MODEL_PATH).trim();
+        trainingMode = !trainingCsv.isEmpty();
+        trainingCsvPath = trainingMode ? Path.of(trainingCsv) : null;
+        evaluationMode = !evaluationCsv.isEmpty();
+        evaluationCsvPath = evaluationMode ? Path.of(evaluationCsv) : null;
+        modelPath = Path.of(configuredModelPath);
     }
 
     @Override
-    public String getIndexPath() {
-        File folder = new File("index_caches");
-        if (!folder.exists()) {
-            folder.mkdir();
-        }
-
-        return "index_caches/" + String.join("_",
-                algorithmType.toString(),
-                datasetName.toString(),
-                String.valueOf(N),
-                String.valueOf(maxM),
-                String.valueOf(seed),
-                String.valueOf(qLen),
-                String.valueOf(channels),
-                normalize ? "1" : "0",
-                String.valueOf(kMeansClusters),
-                String.valueOf(seed),
-                String.valueOf(segmentMethod),
-                String.valueOf(indexLeafSize)
-        ) + ".ser";
-    }
-
-    private void createTree(List<Entry<CandidateSegment, Geometry>> items) {
-        Logger.getGlobal().info("[MS-Index] Building the R-tree");
-        tree = RTree.star().dimensions(treeDimensions).leafSize(buildTree ? indexLeafSize : Integer.MAX_VALUE).create(items);
-
-        if (segmentMethod.equals(SegmentMethods.ADHOC)) {
-            Logger.getGlobal().info("[MS-Index] Post-index segmentation");
-            AdhocSegment.postIndexSegment(tree);
-        }
-    }
-
     public void buildIndex() {
-        Logger.getGlobal().info("[MS-Index] Segmenting the fourier trails");
-        final List<Entry<CandidateSegment, Geometry>> items = DFTUtils.getSegmentedFourierTrail(kMeans);
+        Logger logger = Logger.getGlobal();
+        mass = new MVMASS();
+        msIndex = new MSIndex(true);
+        featureExtractor = new QueryDecisionFeatureExtractor();
 
-        createTree(items);
-    }
+        logger.info("[MS-IndexPP] Building MASS structures");
+        mass.buildIndex();
 
-    @Override
-    public void saveIndex() {
-        String filename = getIndexPath();
+        logger.info("[MS-IndexPP] Building MS-Index structures");
+        withAlgorithmType(AlgorithmType.MSINDEX, () -> {
+            msIndex.buildIndex();
+            return null;
+        });
 
-        try {
-            Logger.getGlobal().info("[MS-Index] Saving the index to file");
-            FileOutputStream fileOut = new FileOutputStream(filename);
-            ObjectOutputStream out = new ObjectOutputStream(fileOut);
-            out.writeObject(tree);
-        } catch (IOException e) {
-            e.printStackTrace();
+        if (trainingMode) {
+            logger.info("[MS-IndexPP] Training mode enabled. Writing rows to " + trainingCsvPath);
+            return;
+        }
+
+        if (Files.exists(modelPath)) {
+            decisionModel = GradientBoostedDecisionModel.load(modelPath);
+            logger.info("[MS-IndexPP] Loaded decision model from " + modelPath);
+        } else {
+            logger.warning("[MS-IndexPP] No decision model found at " + modelPath + ". Falling back to MS-Index.");
         }
     }
 
     @Override
-    public Algorithm loadIndex() {
-        String filename = getIndexPath();
+    public void queryAll() {
+        Logger logger = Logger.getGlobal();
+        logger.info("Starting querying process");
 
-        try {
-            Logger.getGlobal().info("[MS-Index] Loading the index from file");
-            FileInputStream fileIn = new FileInputStream(filename);
-            ObjectInputStream in = new ObjectInputStream(fileIn);
-            tree = (RTree<CandidateSegment, Geometry>) in.readObject();
-            Logger.getGlobal().info("[MS-Index] Index loaded");
-        } catch (IOException | ClassNotFoundException e) {
-            e.printStackTrace();
+        indexing = false;
+        if (!parallel) {
+            ConcurrencyUtils.setNumberOfThreads(1);
         }
-        return this;
-    }
 
-    public ArrayList<CandidateMVSubsequence> kNN(int k, double[][] query) {
-        final Tuple2<double[], LandmarkPortfolio> queryDFTs = DFTUtils.getQueryDFTs(query, kMeans);
-        final double[] fftQFlat = queryDFTs._1();
-        final LandmarkPortfolio queryPortfolio = queryDFTs._2();
-        final MinimumBoundingRectangle queryMBR = new MinimumBoundingRectangle(fftQFlat, fftQFlat, kMeansClusters == 0 ? null : new LandmarkMBR(queryPortfolio));
+        final double[][][] queries = DataManager.queries;
+        queryTimePerQuery = new long[queries.length];
 
-        final ArrayList<CandidateMVSubsequence> initialTopK = firstPass(k, query, queryMBR);
-        final double kThDistance = initialTopK.get(k - 1).totalDistance;
-        Logger.getGlobal().info("[MS-Index] k-th distance after initial topK: " + kThDistance);
+        for (int i = 0; i < queries.length; i++) {
+            final double[][] query = queries[i];
+            final long featureStart = System.currentTimeMillis();
+            final DecisionFeatureVector featureVector = featureExtractor.extract(query);
+            final long featureElapsed = System.currentTimeMillis() - featureStart;
+            totalFeatureExtractionTimeMs += featureElapsed;
 
-        final ArrayList<CandidateMVSubsequence> finalTopK = secondPass(k, query, queryMBR, kThDistance);
+            logger.info(String.format("Querying %d/%d", i, queries.length));
+            logger.info(String.format("[MS-IndexPP] Feature extraction time: %dms", featureElapsed));
 
-        if (finalTopK.isEmpty()) {
-            Logger.getGlobal().warning("No results found for query");
-        }
-        return finalTopK;
-    }
+            final long start = System.currentTimeMillis();
+            final QueryExecution execution = trainingMode
+                    ? runTrainingQuery(i, query, featureVector)
+                    : (evaluationMode
+                    ? runEvaluatedQuery(i, query, featureVector)
+                    : runPredictedQuery(query, featureVector));
+            final long elapsed = System.currentTimeMillis() - start;
 
-    private ArrayList<CandidateMVSubsequence> firstPass(int k, double[][] query, MinimumBoundingRectangle queryMBR) {
-        long start = System.currentTimeMillis();
-        final List<CandidateSegment> candidateSegments = closest(queryMBR, k);
-        indexSearchTime += System.currentTimeMillis() - start;
-
-        start = System.currentTimeMillis();
-        ArrayList<CandidateMVSubsequence> initialTopK = postFilter(query, candidateSegments, k, Double.POSITIVE_INFINITY);
-        exhaustiveTime += System.currentTimeMillis() - start;
-
-        return initialTopK;
-    }
-
-    private ArrayList<CandidateMVSubsequence> secondPass(int k, double[][] query, MinimumBoundingRectangle queryMBR, double threshold) {
-        long start = System.currentTimeMillis();
-        final Iterable<Entry<CandidateSegment, Geometry>> finalCandidates = tree.search(queryMBR, new RunningThreshold(threshold));
-
-        final List<CandidateSegment> finalCandidatesList = lib.getStream(finalCandidates).map(Entry::value).collect(toList());
-
-        segmentsUnderThreshold.getAndAdd(finalCandidatesList.size());
-
-        Logger.getGlobal().info("[MS-Index] Under threshold candidates: " + finalCandidatesList.size());
-        indexSearchTime += System.currentTimeMillis() - start;
-
-        start = System.currentTimeMillis();
-        final ArrayList<CandidateMVSubsequence> finalTopK = postFilter(query, finalCandidatesList, k, threshold);
-        exhaustiveTime += System.currentTimeMillis() - start;
-
-        return finalTopK;
-    }
-
-    private List<CandidateSegment> closest(MinimumBoundingRectangle queryMBR, int k) {
-        final RunningThreshold runningThreshold = new RunningThreshold(Double.POSITIVE_INFINITY);
-        final BoundedPriorityQueue<CandidateSegment> q = new BoundedPriorityQueue<>(k, Comparator.comparingDouble(CandidateSegment::getCurrLB));
-
-        for (Entry<CandidateSegment, Geometry> entry : tree.search(queryMBR, runningThreshold)) {
-            final CandidateSegment candidateSegment = entry.value();
-            q.add(candidateSegment);
-
-            if (q.size() == k) {
-                runningThreshold.set(q.peek().getCurrLB());
+            if (printResults) {
+                execution.results.sort(Comparator.comparingDouble(CandidateMVSubsequence::totalDistance));
+                logger.info(String.format("Results for query %d/%d: ", i, queries.length) + execution.results);
             }
+
+            queryTimePerQuery[i] = elapsed;
+            queryTime += elapsed;
+            currQueryId++;
         }
-        return q.asOrderedList();
+
+        if (evaluationMode && evaluationQueries > 0) {
+            logger.info(String.format(
+                    "[MS-IndexPP] Decision accuracy: %.4f (%d/%d)",
+                    correctPredictions / (double) evaluationQueries,
+                    correctPredictions,
+                    evaluationQueries
+            ));
+            logger.info(String.format(
+                    "[MS-IndexPP] Predicted counts: MASS=%d, MSINDEX=%d",
+                    predictedMassCount,
+                    predictedMsIndexCount
+            ));
+            logger.info(String.format(
+                    "[MS-IndexPP] Actual best counts: MASS=%d, MSINDEX=%d",
+                    actualMassCount,
+                    actualMsIndexCount
+            ));
+        }
+
+        if (queries.length > 0) {
+            logger.info(String.format(
+                    "[MS-IndexPP] Avg feature extraction time: %.4fms",
+                    totalFeatureExtractionTimeMs / (double) queries.length
+            ));
+            logger.info(String.format(
+                    "[MS-IndexPP] Avg decision time: %.4fms",
+                    totalDecisionTimeMs / (double) queries.length
+            ));
+        }
     }
 
-    private long recursiveTreeMemoryUsage(Node<CandidateSegment, Geometry> node) {
-        if (node instanceof NonLeafDefault) {
-            NonLeafDefault<CandidateSegment, Geometry> nonLeaf = (NonLeafDefault<CandidateSegment, Geometry>) node;
-            long memoryUsage = tree.dimensions() * 8L * 2L + 4L * 2L;
-            for (Node<CandidateSegment, Geometry> child : nonLeaf.children()) {
-                memoryUsage += recursiveTreeMemoryUsage(child);
-            }
-            return memoryUsage;
-        } else if (node instanceof LeafDefault) {
-            LeafDefault<CandidateSegment, Geometry> leaf = (LeafDefault<CandidateSegment, Geometry>) node;
-            long memoryUsage = tree.dimensions() * 8L * 2L;
-            memoryUsage += leaf.count() * tree.dimensions() * 8L * 2L + leaf.count() * (4L * 3L + (kMeansClusters == 0 ? 0 : channels * 2L * 8L + channels * 4L));
-            return memoryUsage;
-        }
-        throw new IllegalStateException("Unknown node type " + node.getClass());
+    @Override
+    public List<CandidateMVSubsequence> kNN(int k, double[][] query) {
+        final DecisionFeatureVector featureVector = featureExtractor.extract(query);
+        return runPredictedQuery(query, featureVector).results;
     }
 
+    @Override
     public double memoryUsage() {
-        return recursiveTreeMemoryUsage(tree.root().get()) / 1000000d;
+        double massMemory = mass == null ? 0 : mass.memoryUsage();
+        double msIndexMemory = msIndex == null ? 0 : msIndex.memoryUsage();
+        return massMemory + msIndexMemory;
+    }
+
+    private QueryExecution runTrainingQuery(int queryId, double[][] query, DecisionFeatureVector featureVector) {
+        final TimedResult massResult = timeQuery(() -> mass.kNN(K, query));
+        final TimedResult msIndexResult = timeQuery(() -> msIndex.kNN(K, query));
+
+        final boolean massIsBetter = massResult.elapsedMs < msIndexResult.elapsedMs;
+        DecisionTrainingCsvWriter.append(
+                trainingCsvPath,
+                queryId,
+                featureVector,
+                massResult.elapsedMs,
+                msIndexResult.elapsedMs
+        );
+
+        Logger.getGlobal().info(String.format(
+                "[MS-IndexPP] Training query %d: MASS=%dms, MSINDEX=%dms, winner=%s",
+                queryId,
+                massResult.elapsedMs,
+                msIndexResult.elapsedMs,
+                massIsBetter ? AlgorithmType.MASS : AlgorithmType.MSINDEX
+        ));
+
+        return new QueryExecution(massIsBetter ? massResult.results : msIndexResult.results);
+    }
+
+    private QueryExecution runPredictedQuery(double[][] query, DecisionFeatureVector featureVector) {
+        final long decisionStart = System.currentTimeMillis();
+        final AlgorithmType selectedAlgorithm = decisionModel == null
+                ? AlgorithmType.MSINDEX
+                : decisionModel.predict(featureVector);
+        final long decisionElapsed = System.currentTimeMillis() - decisionStart;
+        totalDecisionTimeMs += decisionElapsed;
+
+        Logger.getGlobal().info("[MS-IndexPP] Decision time: " + decisionElapsed + "ms");
+        Logger.getGlobal().info("[MS-IndexPP] Selected " + selectedAlgorithm + " for current query");
+
+        if (selectedAlgorithm == AlgorithmType.MASS) {
+            return new QueryExecution(mass.kNN(K, query));
+        }
+        return new QueryExecution(msIndex.kNN(K, query));
+    }
+
+    private QueryExecution runEvaluatedQuery(int queryId, double[][] query, DecisionFeatureVector featureVector) {
+        final long decisionStart = System.currentTimeMillis();
+        final AlgorithmType predictedAlgorithm = decisionModel == null
+                ? AlgorithmType.MSINDEX
+                : decisionModel.predict(featureVector);
+        final long decisionElapsed = System.currentTimeMillis() - decisionStart;
+        totalDecisionTimeMs += decisionElapsed;
+
+        final TimedResult massResult = timeQuery(() -> mass.kNN(K, query));
+        final TimedResult msIndexResult = timeQuery(() -> msIndex.kNN(K, query));
+
+        final AlgorithmType actualBestAlgorithm = massResult.elapsedMs < msIndexResult.elapsedMs
+                ? AlgorithmType.MASS
+                : AlgorithmType.MSINDEX;
+        final TimedResult predictedResult = predictedAlgorithm == AlgorithmType.MASS ? massResult : msIndexResult;
+        final boolean predictionCorrect = predictedAlgorithm == actualBestAlgorithm;
+
+        evaluationQueries++;
+        if (predictionCorrect) {
+            correctPredictions++;
+        }
+        if (predictedAlgorithm == AlgorithmType.MASS) {
+            predictedMassCount++;
+        } else {
+            predictedMsIndexCount++;
+        }
+        if (actualBestAlgorithm == AlgorithmType.MASS) {
+            actualMassCount++;
+        } else {
+            actualMsIndexCount++;
+        }
+
+        DecisionEvaluationCsvWriter.append(
+                evaluationCsvPath,
+                queryId,
+                featureVector,
+                predictedAlgorithm,
+                actualBestAlgorithm,
+                predictedResult.elapsedMs,
+                massResult.elapsedMs,
+                msIndexResult.elapsedMs
+        );
+
+        Logger.getGlobal().info(String.format(
+                "[MS-IndexPP] Decision time=%dms, predicted=%s, actualBest=%s, correct=%s, MASS=%dms, MSINDEX=%dms",
+                decisionElapsed,
+                predictedAlgorithm,
+                actualBestAlgorithm,
+                predictionCorrect,
+                massResult.elapsedMs,
+                msIndexResult.elapsedMs
+        ));
+
+        return new QueryExecution(predictedResult.results);
+    }
+
+    private TimedResult timeQuery(QueryRunner queryRunner) {
+        final long start = System.currentTimeMillis();
+        final List<CandidateMVSubsequence> results = queryRunner.run();
+        return new TimedResult(results, System.currentTimeMillis() - start);
+    }
+
+    private static <T> T withAlgorithmType(AlgorithmType targetType, AlgorithmSupplier<T> supplier) {
+        final AlgorithmType previousType = io.github.utils.Parameters.algorithmType;
+        io.github.utils.Parameters.algorithmType = targetType;
+        try {
+            return supplier.get();
+        } finally {
+            io.github.utils.Parameters.algorithmType = previousType;
+        }
+    }
+
+    @FunctionalInterface
+    private interface QueryRunner {
+        List<CandidateMVSubsequence> run();
+    }
+
+    @FunctionalInterface
+    private interface AlgorithmSupplier<T> {
+        T get();
+    }
+
+    private static final class TimedResult {
+        private final List<CandidateMVSubsequence> results;
+        private final long elapsedMs;
+
+        private TimedResult(List<CandidateMVSubsequence> results, long elapsedMs) {
+            this.results = results;
+            this.elapsedMs = elapsedMs;
+        }
+    }
+
+    private static final class QueryExecution {
+        private final List<CandidateMVSubsequence> results;
+
+        private QueryExecution(List<CandidateMVSubsequence> results) {
+            this.results = results;
+        }
     }
 }
