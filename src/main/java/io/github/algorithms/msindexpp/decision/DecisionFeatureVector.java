@@ -16,6 +16,8 @@ public class DecisionFeatureVector {
             "total_subsequences",
             "query_length",
             "query_length_ratio",
+            "query_mu_mean",
+            "query_sigma2_mean",
             "query_abs_mean_mean",
             "query_std_mean",
             "query_std_std",

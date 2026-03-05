@@ -25,6 +25,8 @@ public class QueryDecisionFeatureExtractor {
     }
 
     public DecisionFeatureVector extract(double[][] query) {
+        final double[] perChannelMean = new double[selectedVariatesIdx.length];
+        final double[] perChannelVariance = new double[selectedVariatesIdx.length];
         final double[] perChannelAbsMean = new double[selectedVariatesIdx.length];
         final double[] perChannelStd = new double[selectedVariatesIdx.length];
         final double[] perChannelEnergy = new double[selectedVariatesIdx.length];
@@ -43,6 +45,8 @@ public class QueryDecisionFeatureExtractor {
             final double channelMean = sum / channel.length;
             final double variance = Math.max(0, sumSquares / channel.length - channelMean * channelMean);
 
+            perChannelMean[i] = channelMean;
+            perChannelVariance[i] = variance;
             perChannelAbsMean[i] = sumAbs / channel.length;
             perChannelStd[i] = Math.sqrt(variance);
             perChannelEnergy[i] = sumSquares / channel.length;
@@ -51,7 +55,7 @@ public class QueryDecisionFeatureExtractor {
         final double queryStdMean = mean(perChannelStd);
         final double queryEnergyMean = mean(perChannelEnergy);
         final double queryLengthRatio = avgSeriesLength == 0 ? 0 : query[0].length / avgSeriesLength;
-
+        
         return new DecisionFeatureVector(new double[]{
                 K,
                 channels,
@@ -63,6 +67,8 @@ public class QueryDecisionFeatureExtractor {
                 nSubsequences,
                 query[0].length,
                 queryLengthRatio,
+                // mean(perChannelMean),
+                // mean(perChannelVariance),
                 mean(perChannelAbsMean),
                 queryStdMean,
                 std(perChannelStd, queryStdMean),
