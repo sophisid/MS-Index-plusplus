@@ -1,9 +1,11 @@
 package io.github.algorithms.msindexpp;
 
 import io.github.algorithms.Algorithm;
+import io.github.algorithms.msindexpp.ml.PortableGBDTModel;
+import io.github.algorithms.msindexpp.ml.SecondPassTraversal;
+import io.github.algorithms.msindexpp.ml.TrainingDataWriter;
 import io.github.algorithms.msindexshared.BoundedPriorityQueue;
 import io.github.algorithms.msindexshared.segmentation.SegmentMethods;
-import io.github.algorithms.msindexpp.MinimumBoundingRectangle;
 import io.github.algorithms.msindexpp.segmentation.AdhocSegment;
 import io.github.utils.CandidateMVSubsequence;
 import io.github.utils.CandidateSegment;
@@ -13,7 +15,6 @@ import io.github.utils.LandmarkMBR;
 import io.github.utils.LandmarkPortfolio;
 import io.github.utils.RunningThreshold;
 import io.github.utils.Tuple2;
-import io.github.utils.lib;
 import io.github.utils.rtreemulti.Entry;
 import io.github.utils.rtreemulti.Node;
 import io.github.utils.rtreemulti.RTree;
@@ -29,11 +30,12 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.logging.Logger;
 
 import static io.github.utils.Parameters.*;
-import static java.util.stream.Collectors.toList;
 
 public class MSIndexPP extends Algorithm {
     final KMeans[] kMeans = new KMeans[channels];
@@ -41,6 +43,8 @@ public class MSIndexPP extends Algorithm {
     private final int treeDimensions = fourierLength();
 
     private boolean buildTree = true;
+    private PortableGBDTModel earlyTerminationModel;
+    private boolean attemptedModelLoad = false;
 
     public MSIndexPP(boolean buildTree) {
         this.buildTree = buildTree;
@@ -149,21 +153,88 @@ public class MSIndexPP extends Algorithm {
     }
 
     private ArrayList<CandidateMVSubsequence> secondPass(int k, double[][] query, MinimumBoundingRectangle queryMBR, double threshold) {
-        long start = System.currentTimeMillis();
-        final Iterable<Entry<CandidateSegment, Geometry>> finalCandidates = tree.search(queryMBR, new RunningThreshold(threshold));
+        if (msIndexPPEvaluationEnabled && msIndexPPEarlyTerminationEnabled && !msIndexPPTrainingEnabled) {
+            return secondPassWithEvaluation(k, query, queryMBR, threshold);
+        }
 
-        final List<CandidateSegment> finalCandidatesList = lib.getStream(finalCandidates).map(Entry::value).collect(toList());
+        long start = System.currentTimeMillis();
+        final SecondPassTraversal.TraversalResult traversalResult = SecondPassTraversal.traverse(
+                tree,
+                queryMBR,
+                threshold,
+                k,
+                msIndexPPCheckpointInterval,
+                getCheckpointDecider(),
+                msIndexPPTrainingEnabled
+        );
+
+        final List<CandidateSegment> finalCandidatesList = traversalResult.acceptedCandidates;
 
         segmentsUnderThreshold.getAndAdd(finalCandidatesList.size());
 
         Logger.getGlobal().info("[MS-Index] Under threshold candidates: " + finalCandidatesList.size());
+        if (traversalResult.stoppedEarly) {
+            Logger.getGlobal().info(String.format("[MS-IndexPP] Early termination triggered at checkpoint %d with score %.4f",
+                    traversalResult.lastCheckpointId, traversalResult.stopScore));
+        }
         indexSearchTime += System.currentTimeMillis() - start;
 
         start = System.currentTimeMillis();
         final ArrayList<CandidateMVSubsequence> finalTopK = postFilter(query, finalCandidatesList, k, threshold);
         exhaustiveTime += System.currentTimeMillis() - start;
 
+        if (msIndexPPTrainingEnabled && !traversalResult.checkpoints.isEmpty()) {
+            persistTrainingRows(query, k, threshold, finalCandidatesList, finalTopK, traversalResult);
+        }
+
         return finalTopK;
+    }
+
+    private ArrayList<CandidateMVSubsequence> secondPassWithEvaluation(int k, double[][] query, MinimumBoundingRectangle queryMBR, double threshold) {
+        long start = System.currentTimeMillis();
+        final SecondPassTraversal.TraversalResult exactTraversal = SecondPassTraversal.traverse(
+                tree,
+                queryMBR,
+                threshold,
+                k,
+                msIndexPPCheckpointInterval,
+                null,
+                false
+        );
+        final SecondPassTraversal.TraversalResult earlyTraversal = SecondPassTraversal.traverse(
+                tree,
+                queryMBR,
+                threshold,
+                k,
+                msIndexPPCheckpointInterval,
+                getCheckpointDecider(),
+                false
+        );
+        indexSearchTime += System.currentTimeMillis() - start;
+
+        segmentsUnderThreshold.getAndAdd(earlyTraversal.acceptedCandidates.size());
+
+        start = System.currentTimeMillis();
+        final ArrayList<CandidateMVSubsequence> exactTopK = postFilter(query, exactTraversal.acceptedCandidates, k, threshold);
+        final ArrayList<CandidateMVSubsequence> earlyTopK = postFilter(query, earlyTraversal.acceptedCandidates, k, threshold);
+        exhaustiveTime += System.currentTimeMillis() - start;
+
+        double achievedAccuracy = overlapAccuracy(earlyTopK, exactTopK, k);
+        msIndexPPEarlyTerminationAccuracySum.add(achievedAccuracy);
+        if (earlyTraversal.stoppedEarly) {
+            msIndexPPEarlyStops.incrementAndGet();
+        }
+
+        Logger.getGlobal().info(String.format(
+                "[MS-IndexPP] Eval query=%d earlyStop=%s accuracy=%.4f earlyCandidates=%d exactCandidates=%d",
+                currQueryId,
+                earlyTraversal.stoppedEarly,
+                achievedAccuracy,
+                earlyTraversal.acceptedCandidates.size(),
+                exactTraversal.acceptedCandidates.size()
+        ));
+
+        return earlyTopK;
     }
 
     private List<CandidateSegment> closest(MinimumBoundingRectangle queryMBR, int k) {
@@ -179,6 +250,93 @@ public class MSIndexPP extends Algorithm {
             }
         }
         return q.asOrderedList();
+    }
+
+    private SecondPassTraversal.CheckpointDecider getCheckpointDecider() {
+        if (msIndexPPTrainingEnabled || !msIndexPPEarlyTerminationEnabled) {
+            return null;
+        }
+
+        PortableGBDTModel model = getEarlyTerminationModel();
+        if (model == null) {
+            return null;
+        }
+
+        return new SecondPassTraversal.CheckpointDecider() {
+            @Override
+            public double score(io.github.algorithms.msindexpp.ml.TraversalFeatureSnapshot snapshot) {
+                return model.predictProbability(snapshot);
+            }
+
+            @Override
+            public boolean shouldStop(io.github.algorithms.msindexpp.ml.TraversalFeatureSnapshot snapshot, double score) {
+                return score >= msIndexPPModelScoreThreshold;
+            }
+        };
+    }
+
+    private PortableGBDTModel getEarlyTerminationModel() {
+        if (attemptedModelLoad) {
+            return earlyTerminationModel;
+        }
+        attemptedModelLoad = true;
+
+        File modelFile = new File(msIndexPPModelPath);
+        if (!modelFile.exists()) {
+            Logger.getGlobal().warning("[MS-IndexPP] No early termination model found at " + modelFile.getPath());
+            return null;
+        }
+
+        try {
+            earlyTerminationModel = PortableGBDTModel.load(modelFile);
+            Logger.getGlobal().info("[MS-IndexPP] Loaded early termination model from " + modelFile.getPath());
+        } catch (IOException e) {
+            Logger.getGlobal().warning("[MS-IndexPP] Could not load early termination model: " + e.getMessage());
+            earlyTerminationModel = null;
+        }
+        return earlyTerminationModel;
+    }
+
+    private void persistTrainingRows(double[][] query, int k, double threshold,
+                                     List<CandidateSegment> finalCandidatesList,
+                                     ArrayList<CandidateMVSubsequence> finalTopK,
+                                     SecondPassTraversal.TraversalResult traversalResult) {
+        List<TrainingDataWriter.TrainingRow> rows = new ArrayList<>();
+        for (SecondPassTraversal.CheckpointRecord checkpoint : traversalResult.checkpoints) {
+            if (checkpoint.candidateCountAtCheckpoint < k) {
+                continue;
+            }
+
+            List<CandidateSegment> partialCandidates = finalCandidatesList.subList(0, checkpoint.candidateCountAtCheckpoint);
+            ArrayList<CandidateMVSubsequence> partialTopK = postFilter(query, partialCandidates, k, threshold);
+            double achievedAccuracy = overlapAccuracy(partialTopK, finalTopK, k);
+            boolean label = achievedAccuracy >= msIndexPPAccuracyTarget;
+
+            rows.add(new TrainingDataWriter.TrainingRow(
+                    checkpoint.snapshot,
+                    label,
+                    achievedAccuracy,
+                    checkpoint.candidateCountAtCheckpoint,
+                    finalCandidatesList.size()
+            ));
+        }
+
+        try {
+            TrainingDataWriter.appendRows(msIndexPPTrainingDataPath, currQueryId, rows);
+        } catch (IOException e) {
+            Logger.getGlobal().warning("[MS-IndexPP] Could not persist training rows: " + e.getMessage());
+        }
+    }
+
+    private double overlapAccuracy(List<CandidateMVSubsequence> partialTopK, List<CandidateMVSubsequence> finalTopK, int k) {
+        Set<CandidateMVSubsequence> partialSet = new HashSet<>(partialTopK);
+        int overlap = 0;
+        for (CandidateMVSubsequence candidate : finalTopK) {
+            if (partialSet.contains(candidate)) {
+                overlap++;
+            }
+        }
+        return overlap / (double) k;
     }
 
     private long recursiveTreeMemoryUsage(Node<CandidateSegment, Geometry> node) {

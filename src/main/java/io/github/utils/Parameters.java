@@ -20,6 +20,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.DoubleAdder;
 import java.util.stream.Collectors;
 import java.util.logging.*;
 import java.util.stream.IntStream;
@@ -55,6 +56,15 @@ public class Parameters {
     public static DimensionWeightingStrategy dimensionWeightingStrategy = DimensionWeightingStrategy.VARIANCE;
     public static boolean queryFromIndexed = true;
     public static int kvMatchSegmentDivisor = 1;
+    public static boolean msIndexPPEarlyTerminationEnabled = false;
+    public static boolean msIndexPPTrainingEnabled = false;
+    public static boolean msIndexPPEvaluationEnabled = false;
+    public static int msIndexPPCheckpointInterval = 64;
+    public static double msIndexPPAccuracyTarget = 0.9;
+    public static double msIndexPPModelScoreThreshold = 0.5;
+    public static String msIndexPPArtifactsDir = "artifacts/msindexpp";
+    public static String msIndexPPTrainingDataPath = "";
+    public static String msIndexPPModelPath = "";
 
     @Hide
     public static Random random;
@@ -106,6 +116,8 @@ public class Parameters {
     public static double indexSize;
     public static long[] queryTimePerQuery;
     public static AtomicLong nSegments = new AtomicLong(0);
+    public static AtomicLong msIndexPPEarlyStops = new AtomicLong(0);
+    public static DoubleAdder msIndexPPEarlyTerminationAccuracySum = new DoubleAdder();
     public static double totalLeafVolume;
     public static double totalLeafLogVolume;
     public static double totalLeafMargin;
@@ -122,6 +134,7 @@ public class Parameters {
 
 //        Set dataset name to basename of datapath
         datasetName = new File(dataPath).getName();
+        setMSIndexPPArtifactPaths();
     }
 
     public static void setDependentParametersPostLoad() {
@@ -298,6 +311,28 @@ public class Parameters {
 
     public static void newRandom() {
         random = new Random(seed);
+    }
+
+    public static void applySystemOverrides() {
+        msIndexPPEarlyTerminationEnabled = Boolean.parseBoolean(System.getProperty("msindexpp.earlyTerminationEnabled", String.valueOf(msIndexPPEarlyTerminationEnabled)));
+        msIndexPPTrainingEnabled = Boolean.parseBoolean(System.getProperty("msindexpp.trainingEnabled", String.valueOf(msIndexPPTrainingEnabled)));
+        msIndexPPEvaluationEnabled = Boolean.parseBoolean(System.getProperty("msindexpp.evaluationEnabled", String.valueOf(msIndexPPEvaluationEnabled)));
+        msIndexPPCheckpointInterval = Integer.parseInt(System.getProperty("msindexpp.checkpointInterval", String.valueOf(msIndexPPCheckpointInterval)));
+        msIndexPPAccuracyTarget = Double.parseDouble(System.getProperty("msindexpp.accuracyTarget", String.valueOf(msIndexPPAccuracyTarget)));
+        msIndexPPModelScoreThreshold = Double.parseDouble(System.getProperty("msindexpp.modelScoreThreshold", String.valueOf(msIndexPPModelScoreThreshold)));
+        msIndexPPArtifactsDir = System.getProperty("msindexpp.artifactsDir", msIndexPPArtifactsDir);
+        msIndexPPTrainingDataPath = System.getProperty("msindexpp.trainingDataPath", msIndexPPTrainingDataPath);
+        msIndexPPModelPath = System.getProperty("msindexpp.modelPath", msIndexPPModelPath);
+    }
+
+    private static void setMSIndexPPArtifactPaths() {
+        String datasetArtifactDir = msIndexPPArtifactsDir + "/" + datasetName;
+        if (msIndexPPTrainingDataPath == null || msIndexPPTrainingDataPath.isBlank()) {
+            msIndexPPTrainingDataPath = datasetArtifactDir + "/training-data.jsonl";
+        }
+        if (msIndexPPModelPath == null || msIndexPPModelPath.isBlank()) {
+            msIndexPPModelPath = datasetArtifactDir + "/gbdt-model.json";
+        }
     }
 
     public enum RuntimeMode {

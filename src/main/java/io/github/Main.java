@@ -118,6 +118,7 @@ public class Main {
 
         // Parameters
         setParameters(args);
+        Parameters.applySystemOverrides();
         setDependentParametersPreLoad();
 
         // Generate/load dataset
@@ -214,6 +215,11 @@ public class Main {
         logger.info("Avg leaf margin: " + totalLeafMargin / (double) nLeafs);
         logger.info("Avg number of nodes visited: " + nNodesVisited / (double) nQueries);
         logger.info("Avg number of leafs visited: " + nLeafsVisited / (double) nQueries);
+        if (algorithmType == AlgorithmType.MSINDEXPP && msIndexPPEvaluationEnabled) {
+            logger.info("-------------------- MSIndexPP eval --------------------");
+            logger.info("Early stop rate: " + msIndexPPEarlyStops.get() / (double) nQueries);
+            logger.info("Avg early termination top-K overlap accuracy: " + msIndexPPEarlyTerminationAccuracySum.sum() / nQueries);
+        }
 
         // Write to file
         Parameters.saveParams();
