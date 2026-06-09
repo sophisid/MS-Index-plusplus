@@ -32,9 +32,6 @@ FEATURE_NAMES = [
     "threshold_minus_frontier_best",
     "candidate_rate",
     "enqueue_per_step",
-    "nodes_completed_ratio",
-    "leafs_completed_ratio",
-    "frontier_ratio",
 ]
 
 

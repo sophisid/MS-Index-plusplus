@@ -278,6 +278,10 @@ public class MSIndexPP extends Algorithm {
             return null;
         }
 
+        final double scoreThreshold = model.getConformalThreshold() != null
+                ? model.getConformalThreshold()
+                : msIndexPPModelScoreThreshold;
+
         return new SecondPassTraversal.CheckpointDecider() {
             @Override
             public double score(io.github.algorithms.msindexpp.ml.TraversalFeatureSnapshot snapshot) {
@@ -286,7 +290,7 @@ public class MSIndexPP extends Algorithm {
 
             @Override
             public boolean shouldStop(io.github.algorithms.msindexpp.ml.TraversalFeatureSnapshot snapshot, double score) {
-                return score >= msIndexPPModelScoreThreshold;
+                return score >= scoreThreshold;
             }
         };
     }

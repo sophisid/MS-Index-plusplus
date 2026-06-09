@@ -17,14 +17,16 @@ public class PortableGBDTModel {
     private final double initScore;
     private final List<Tree> trees;
     private final Double constantProbability;
+    private final Double conformalThreshold;
 
     private PortableGBDTModel(List<String> featureNames, double learningRate, double initScore, List<Tree> trees,
-                              Double constantProbability) {
+                              Double constantProbability, Double conformalThreshold) {
         this.featureNames = featureNames;
         this.learningRate = learningRate;
         this.initScore = initScore;
         this.trees = trees;
         this.constantProbability = constantProbability;
+        this.conformalThreshold = conformalThreshold;
     }
 
     public static PortableGBDTModel load(File modelFile) throws IOException {
@@ -50,8 +52,14 @@ public class PortableGBDTModel {
                 root.path("learning_rate").asDouble(),
                 root.path("init_score").asDouble(),
                 trees,
-                root.has("constant_probability") ? root.path("constant_probability").asDouble() : null
+                root.has("constant_probability") ? root.path("constant_probability").asDouble() : null,
+                root.has("conformal_threshold")   ? root.path("conformal_threshold").asDouble()   : null
         );
+    }
+
+    /** Returns the conformal threshold calibrated during training, or null for older models. */
+    public Double getConformalThreshold() {
+        return conformalThreshold;
     }
 
     public double predictProbability(TraversalFeatureSnapshot snapshot) {
