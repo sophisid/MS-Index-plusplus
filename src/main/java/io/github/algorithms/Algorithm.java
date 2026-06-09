@@ -128,11 +128,15 @@ public abstract class Algorithm {
         //        Query all and print results
         double[][][] queries = DataManager.queries;
         queryTimePerQuery = new long[queries.length];
+        prepareQuerying();
 
         for (int i = 0; i < queries.length; i++) {
-            long lstart = System.currentTimeMillis();
             logger.info(String.format("Querying %d/%d", i, queries.length));
+            long lstart = System.currentTimeMillis();
             final List<CandidateMVSubsequence> results = kNN(K, queries[i]);
+            long time = System.currentTimeMillis() - lstart;
+            queryTimePerQuery[i] = time;
+            queryTime += time;
             if (printResults) {
 //                Sort results by distance
                 results.sort(Comparator.comparingDouble(CandidateMVSubsequence::totalDistance));
@@ -148,11 +152,12 @@ public abstract class Algorithm {
                     }
                 }
             }
-            long time = System.currentTimeMillis() - lstart;
-            queryTimePerQuery[i] = time;
-            queryTime += time;
             currQueryId++;
         }
+    }
+
+    protected void prepareQuerying() {
+        // Optional hook for one-time setup that should not be counted as per-query latency.
     }
 
     public abstract List<CandidateMVSubsequence> kNN(int k, double[][] query);

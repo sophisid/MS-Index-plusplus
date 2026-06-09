@@ -141,7 +141,7 @@ public class Main {
             if (queryFromIndexed) {
                 DataManager.queries = WorkloadGenerator.generateWorkload(DataManager.data, nQueries, qLen, queryNoiseEps, queryFromIndexed, normalize, random);
             } else {
-                DataManager.queries = WorkloadGenerator.generateWorkload(DataLoader.withheldTimeSeries, nQueries, qLen, 0, queryFromIndexed, normalize, random);
+                DataManager.queries = WorkloadGenerator.generateWorkload(DataLoader.withheldTimeSeries, nQueries, qLen, queryNoiseEps, queryFromIndexed, normalize, random);
             }
         }
 
@@ -215,9 +215,16 @@ public class Main {
         logger.info("Avg leaf margin: " + totalLeafMargin / (double) nLeafs);
         logger.info("Avg number of nodes visited: " + nNodesVisited / (double) nQueries);
         logger.info("Avg number of leafs visited: " + nLeafsVisited / (double) nQueries);
+        if (algorithmType == AlgorithmType.MSINDEXPP && msIndexPPEarlyTerminationEnabled) {
+            logger.info("-------------------- MSIndexPP early termination --------------------");
+            logger.info("Early stop rate: " + msIndexPPEarlyStops.get() / (double) nQueries);
+            double avgEarlyTerminationSteps = msIndexPPEarlyStops.get() == 0
+                    ? 0d
+                    : msIndexPPEarlyTerminationSteps.get() / (double) msIndexPPEarlyStops.get();
+            logger.info("Avg early termination steps: " + avgEarlyTerminationSteps);
+        }
         if (algorithmType == AlgorithmType.MSINDEXPP && msIndexPPEvaluationEnabled) {
             logger.info("-------------------- MSIndexPP eval --------------------");
-            logger.info("Early stop rate: " + msIndexPPEarlyStops.get() / (double) nQueries);
             logger.info("Avg early termination top-K overlap accuracy: " + msIndexPPEarlyTerminationAccuracySum.sum() / nQueries);
         }
 

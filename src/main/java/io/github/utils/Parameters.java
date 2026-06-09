@@ -117,6 +117,7 @@ public class Parameters {
     public static long[] queryTimePerQuery;
     public static AtomicLong nSegments = new AtomicLong(0);
     public static AtomicLong msIndexPPEarlyStops = new AtomicLong(0);
+    public static AtomicLong msIndexPPEarlyTerminationSteps = new AtomicLong(0);
     public static DoubleAdder msIndexPPEarlyTerminationAccuracySum = new DoubleAdder();
     public static double totalLeafVolume;
     public static double totalLeafLogVolume;
@@ -140,7 +141,7 @@ public class Parameters {
     public static void setDependentParametersPostLoad() {
 
         if (qLen == -1) qLen = (int) Math.ceil(.2 * maxM);
-        qLen = Math.max(qLen, Math.min(20, maxM)); // at least 20, if not possible, maxM
+        qLen = Math.min(qLen, maxM);
 
 //        Selected variates config
         setSelectedVariates();
@@ -314,6 +315,7 @@ public class Parameters {
     }
 
     public static void applySystemOverrides() {
+        outputPath = System.getProperty("output.path", outputPath);
         msIndexPPEarlyTerminationEnabled = Boolean.parseBoolean(System.getProperty("msindexpp.earlyTerminationEnabled", String.valueOf(msIndexPPEarlyTerminationEnabled)));
         msIndexPPTrainingEnabled = Boolean.parseBoolean(System.getProperty("msindexpp.trainingEnabled", String.valueOf(msIndexPPTrainingEnabled)));
         msIndexPPEvaluationEnabled = Boolean.parseBoolean(System.getProperty("msindexpp.evaluationEnabled", String.valueOf(msIndexPPEvaluationEnabled)));

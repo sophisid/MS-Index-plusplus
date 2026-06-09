@@ -53,6 +53,13 @@ public class MSIndexPP extends Algorithm {
     }
 
     @Override
+    protected void prepareQuerying() {
+        if (!msIndexPPTrainingEnabled && msIndexPPEarlyTerminationEnabled) {
+            getEarlyTerminationModel();
+        }
+    }
+
+    @Override
     public String getIndexPath() {
         File folder = new File("index_caches");
         if (!folder.exists()) {
@@ -60,7 +67,7 @@ public class MSIndexPP extends Algorithm {
         }
 
         return "index_caches/" + String.join("_",
-                algorithmType.toString(),
+                "MSINDEX",
                 datasetName.toString(),
                 String.valueOf(N),
                 String.valueOf(maxM),
@@ -129,7 +136,7 @@ public class MSIndexPP extends Algorithm {
         final MinimumBoundingRectangle queryMBR = new MinimumBoundingRectangle(fftQFlat, fftQFlat, kMeansClusters == 0 ? null : new LandmarkMBR(queryPortfolio));
 
         final ArrayList<CandidateMVSubsequence> initialTopK = firstPass(k, query, queryMBR);
-        final double kThDistance = initialTopK.get(k - 1).totalDistance;
+        final double kThDistance = Math.max(0d, initialTopK.get(k - 1).totalDistance);
         Logger.getGlobal().info("[MS-Index] k-th distance after initial topK: " + kThDistance);
 
         final ArrayList<CandidateMVSubsequence> finalTopK = secondPass(k, query, queryMBR, kThDistance);
@@ -174,8 +181,14 @@ public class MSIndexPP extends Algorithm {
 
         Logger.getGlobal().info("[MS-Index] Under threshold candidates: " + finalCandidatesList.size());
         if (traversalResult.stoppedEarly) {
-            Logger.getGlobal().info(String.format("[MS-IndexPP] Early termination triggered at checkpoint %d with score %.4f",
-                    traversalResult.lastCheckpointId, traversalResult.stopScore));
+            msIndexPPEarlyStops.incrementAndGet();
+            msIndexPPEarlyTerminationSteps.addAndGet(traversalResult.stepsExecuted);
+            Logger.getGlobal().info(String.format(
+                    "[MS-IndexPP] Early termination triggered at checkpoint %d after %d steps with score %.4f",
+                    traversalResult.lastCheckpointId,
+                    traversalResult.stepsExecuted,
+                    traversalResult.stopScore
+            ));
         }
         indexSearchTime += System.currentTimeMillis() - start;
 
@@ -223,15 +236,18 @@ public class MSIndexPP extends Algorithm {
         msIndexPPEarlyTerminationAccuracySum.add(achievedAccuracy);
         if (earlyTraversal.stoppedEarly) {
             msIndexPPEarlyStops.incrementAndGet();
+            msIndexPPEarlyTerminationSteps.addAndGet(earlyTraversal.stepsExecuted);
         }
 
         Logger.getGlobal().info(String.format(
-                "[MS-IndexPP] Eval query=%d earlyStop=%s accuracy=%.4f earlyCandidates=%d exactCandidates=%d",
+                "[MS-IndexPP] Eval query=%d earlyStop=%s accuracy=%.4f earlyCandidates=%d exactCandidates=%d earlySteps=%d exactSteps=%d",
                 currQueryId,
                 earlyTraversal.stoppedEarly,
                 achievedAccuracy,
                 earlyTraversal.acceptedCandidates.size(),
-                exactTraversal.acceptedCandidates.size()
+                exactTraversal.acceptedCandidates.size(),
+                earlyTraversal.stepsExecuted,
+                exactTraversal.stepsExecuted
         ));
 
         return earlyTopK;

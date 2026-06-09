@@ -121,7 +121,7 @@ public class MSIndex extends Algorithm {
 
 //        Derive an initial top k.
         final ArrayList<CandidateMVSubsequence> initialTopK = firstPass(k, query, queryMBR);
-        final double kThDistance = initialTopK.get(k - 1).totalDistance;
+        final double kThDistance = Math.max(0d, initialTopK.get(k - 1).totalDistance);
         Logger.getGlobal().info("[MS-Index] k-th distance after initial topK: " + kThDistance);
 
 //        Derive the exact topK

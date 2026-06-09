@@ -1,7 +1,5 @@
 package io.github.algorithms.msindexpp.ml;
 
-import io.github.utils.Parameters;
-
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -27,10 +25,7 @@ public class TraversalFeatureSnapshot {
             "threshold",
             "threshold_minus_frontier_best",
             "candidate_rate",
-            "enqueue_per_step",
-            "nodes_completed_ratio",
-            "leafs_completed_ratio",
-            "frontier_ratio"
+            "enqueue_per_step"
     );
 
     public final int requestedK;
@@ -82,10 +77,6 @@ public class TraversalFeatureSnapshot {
                 : threshold - frontierBestDistance;
         double candidateRate = distanceComputations == 0 ? 0d : candidateCount / (double) distanceComputations;
         double enqueuePerStep = distanceComputations == 0 ? 0d : childrenEnqueued / (double) distanceComputations;
-        double nodesCompletedRatio = Parameters.nNodes == 0 ? 0d : nodesCompleted / (double) Parameters.nNodes;
-        double leafsCompletedRatio = Parameters.nLeafs == 0 ? 0d : leafsCompleted / (double) Parameters.nLeafs;
-        double frontierRatio = Parameters.nNodes == 0 ? 0d : frontierSize / (double) Parameters.nNodes;
-
         LinkedHashMap<String, Double> featureMap = new LinkedHashMap<>();
         featureMap.put("requested_k", (double) requestedK);
         featureMap.put("checkpoint_id", (double) checkpointId);
@@ -107,9 +98,6 @@ public class TraversalFeatureSnapshot {
         featureMap.put("threshold_minus_frontier_best", thresholdMinusFrontierBest);
         featureMap.put("candidate_rate", candidateRate);
         featureMap.put("enqueue_per_step", enqueuePerStep);
-        featureMap.put("nodes_completed_ratio", nodesCompletedRatio);
-        featureMap.put("leafs_completed_ratio", leafsCompletedRatio);
-        featureMap.put("frontier_ratio", frontierRatio);
         return featureMap;
     }
 }

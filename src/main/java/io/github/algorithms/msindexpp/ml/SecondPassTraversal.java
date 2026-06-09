@@ -30,7 +30,7 @@ public class SecondPassTraversal {
                                            boolean collectCheckpoints) {
         Optional<? extends Node<CandidateSegment, Geometry>> root = tree.root();
         if (root.isEmpty()) {
-            return new TraversalResult(new ArrayList<>(), new ArrayList<>(), false, -1d, 0);
+            return new TraversalResult(new ArrayList<>(), new ArrayList<>(), false, -1d, 0, 0L);
         }
 
         PriorityQueue<SearchNodeState> frontier = new PriorityQueue<>(Comparator.comparingDouble(SearchNodeState::priority));
@@ -84,13 +84,20 @@ public class SecondPassTraversal {
                 if (checkpointDecider != null && acceptedCandidates.size() >= requestedK) {
                     double score = checkpointDecider.score(snapshot);
                     if (checkpointDecider.shouldStop(snapshot, score)) {
-                        return new TraversalResult(acceptedCandidates, checkpoints, true, score, snapshot.checkpointId);
+                        return new TraversalResult(
+                                acceptedCandidates,
+                                checkpoints,
+                                true,
+                                score,
+                                snapshot.checkpointId,
+                                stats.distanceComputations
+                        );
                     }
                 }
             }
         }
 
-        return new TraversalResult(acceptedCandidates, checkpoints, false, -1d, stats.checkpointId);
+        return new TraversalResult(acceptedCandidates, checkpoints, false, -1d, stats.checkpointId, stats.distanceComputations);
     }
 
     public interface CheckpointDecider {
@@ -105,14 +112,16 @@ public class SecondPassTraversal {
         public final boolean stoppedEarly;
         public final double stopScore;
         public final int lastCheckpointId;
+        public final long stepsExecuted;
 
         public TraversalResult(List<CandidateSegment> acceptedCandidates, List<CheckpointRecord> checkpoints,
-                               boolean stoppedEarly, double stopScore, int lastCheckpointId) {
+                               boolean stoppedEarly, double stopScore, int lastCheckpointId, long stepsExecuted) {
             this.acceptedCandidates = acceptedCandidates;
             this.checkpoints = checkpoints;
             this.stoppedEarly = stoppedEarly;
             this.stopScore = stopScore;
             this.lastCheckpointId = lastCheckpointId;
+            this.stepsExecuted = stepsExecuted;
         }
     }
 
