@@ -169,3 +169,9 @@ index_caches/*
 folder/*
 artifacts.zip
 artifacts_new/*
+
+# Jens stuff
+data/
+logs/
+preprocessed.tar
+output/
