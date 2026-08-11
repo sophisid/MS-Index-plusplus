@@ -166,3 +166,5 @@ artifacts/*
 index_caches/*
 .codex
 .claude/settings.json
+folder/*
+artifacts.zip
