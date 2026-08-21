@@ -719,6 +719,13 @@ def main() -> int:
     parser.add_argument("--checkpoint-interval", type=int, default=64)
     parser.add_argument("--accuracy-target", type=float, default=0.9)
     parser.add_argument("--model-score-threshold", type=float, default=0.5)
+    parser.add_argument(
+        "--normalize-values",
+        nargs="+",
+        choices=("false", "true"),
+        default=None,
+        help="Restrict the run to raw/normalized data. Default: both values.",
+    )
     parser.add_argument("--skip-train", action="store_true")
     parser.add_argument("--skip-eval", action="store_true")
     parser.add_argument("--skip-benchmark", action="store_true")
@@ -746,6 +753,9 @@ def main() -> int:
         help="Noise values to run for queryFromIndexed=false OOD queries.",
     )
     args = parser.parse_args()
+    global NORMALIZE_VALUES
+    if args.normalize_values is not None:
+        NORMALIZE_VALUES = [value == "true" for value in args.normalize_values]
     if args.from_index_values is not None:
         args.from_index_values = [value in ("1", "true") for value in args.from_index_values]
 

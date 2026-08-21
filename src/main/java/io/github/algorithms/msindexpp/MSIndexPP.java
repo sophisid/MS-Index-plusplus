@@ -232,6 +232,8 @@ public class MSIndexPP extends Algorithm {
         final ArrayList<CandidateMVSubsequence> earlyTopK = postFilter(query, earlyTraversal.acceptedCandidates, k, threshold);
         exhaustiveTime += System.currentTimeMillis() - start;
 
+        final double exactTopKDist = topKDistance(exactTopK);
+        final double earlyTopKDist = topKDistance(earlyTopK);
         double achievedAccuracy = overlapAccuracy(earlyTopK, exactTopK, k);
         msIndexPPEarlyTerminationAccuracySum.add(achievedAccuracy);
         if (earlyTraversal.stoppedEarly) {
@@ -240,17 +242,26 @@ public class MSIndexPP extends Algorithm {
         }
 
         Logger.getGlobal().info(String.format(
-                "[MS-IndexPP] Eval query=%d earlyStop=%s accuracy=%.4f earlyCandidates=%d exactCandidates=%d earlySteps=%d exactSteps=%d",
+                "[MS-IndexPP] Eval query=%d earlyStop=%s accuracy=%.4f earlyCandidates=%d exactCandidates=%d earlySteps=%d exactSteps=%d earlyTopKDist=%.12f exactTopKDist=%.12f",
                 currQueryId,
                 earlyTraversal.stoppedEarly,
                 achievedAccuracy,
                 earlyTraversal.acceptedCandidates.size(),
                 exactTraversal.acceptedCandidates.size(),
                 earlyTraversal.stepsExecuted,
-                exactTraversal.stepsExecuted
+                exactTraversal.stepsExecuted,
+                earlyTopKDist,
+                exactTopKDist
         ));
 
         return earlyTopK;
+    }
+
+    private double topKDistance(ArrayList<CandidateMVSubsequence> topK) {
+        if (topK == null || topK.isEmpty()) {
+            return Double.NaN;
+        }
+        return topK.get(topK.size() - 1).totalDistance;
     }
 
     private List<CandidateSegment> closest(MinimumBoundingRectangle queryMBR, int k) {

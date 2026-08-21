@@ -168,3 +168,4 @@ index_caches/*
 .claude/settings.json
 folder/*
 artifacts.zip
+artifacts_new/*

@@ -13,7 +13,7 @@ To change the parameters, modify the [run.sh]() script.
 
 ## Parameters
 The parameters in the `run.sh` script are as follows:
-- `algorithmType`: The type of algorithm to use (MSINDEX, MSINDEXPP, BRUTE_FORCE, MASS, ST_INDEX, DSTREE, default: MSINDEX)
+- `algorithmType`: The type of algorithm to use (MSINDEX, MSINDEXPP, HYBRID, BRUTE_FORCE, MASS, ST_INDEX, DSTREE, default: MSINDEX)
 - `dataPath`: Path to the data directory (default: data/synthetic)
 - `N`: Number of time series to read from the dataset (default: 100)
 - `channels`: Number of channels to read for each time series (-1 means all channels, default: -1)
@@ -102,3 +102,26 @@ bash scripts/run_msindexpp_train_eval.sh
 ```
 
 Useful environment overrides for the script include `TRAIN_QUERIES`, `EVAL_QUERIES`, `CHECKPOINT_INTERVAL`, `MODEL_SCORE_THRESHOLD`, `DATA_PATH`, `N`, `Q_LEN`, and `K`.
+
+## Hybrid Start-Time Routing
+
+The `HYBRID` algorithm builds both `MASS` and `MSINDEX`, extracts a fixed query-level feature vector before search, and predicts which exact method should answer the query.
+
+The `HYBRID` routing model supports:
+- collecting per-query training rows to learn `MASS` vs `MSINDEX`
+- loading a portable Python GBDT model in Java
+- evaluating predicted-vs-actual best algorithm per query
+
+Useful JVM properties:
+- `-Dhybrid.trainingCsv=...` to collect training rows
+- `-Dhybrid.evaluationCsv=...` to log evaluation rows
+- `-Dhybrid.modelPath=...` to load a trained routing model
+- `-Dhybrid.artifactsDir=artifacts/hybrid` to change the default artifact root
+
+Train a routing model:
+
+```bash
+bash scripts/HYBRID_jobs.sh --submit
+```
+
+Run one dataset directly with `bash scripts/HYBRID_jobs.sh --dataset synthetic`.
