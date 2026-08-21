@@ -39,7 +39,7 @@ source "$SCRIPT_DIR/config.sh"
 JAR_PATH="${JAR_PATH:-$ROOT/target/MS-Index-1.0-jar-with-dependencies.jar}"
 PYTHON_BIN="${PYTHON_BIN:-/usr/bin/python3.10}"
 SUITE="$ROOT/scripts/run_msindexpp_dataset_suite.py"
-ARTIFACT_ROOT="${ARTIFACT_ROOT:-$ROOT/artifacts/early_termination_all_20260821}"
+ARTIFACT_ROOT="${ARTIFACT_ROOT:-$ROOT/artifacts_early_termination}"
 TRAINING_ROOT="${TRAINING_ROOT:-$ARTIFACT_ROOT/training_private}"
 RESULT_ROOT="${RESULT_ROOT:-$ARTIFACT_ROOT/results}"
 if [[ "$ARTIFACT_ROOT" != /* ]]; then ARTIFACT_ROOT="$ROOT/$ARTIFACT_ROOT"; fi
