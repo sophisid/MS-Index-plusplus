@@ -65,6 +65,7 @@ public class Parameters {
     public static String msIndexPPArtifactsDir = "artifacts/msindexpp";
     public static String msIndexPPTrainingDataPath = "";
     public static String msIndexPPModelPath = "";
+    public static String msIndexPPLowerBoundTracePath = "";
 
     @Hide
     public static Random random;
@@ -325,6 +326,7 @@ public class Parameters {
         msIndexPPArtifactsDir = System.getProperty("msindexpp.artifactsDir", msIndexPPArtifactsDir);
         msIndexPPTrainingDataPath = System.getProperty("msindexpp.trainingDataPath", msIndexPPTrainingDataPath);
         msIndexPPModelPath = System.getProperty("msindexpp.modelPath", msIndexPPModelPath);
+        msIndexPPLowerBoundTracePath = System.getProperty("msindexpp.lowerBoundTracePath", msIndexPPLowerBoundTracePath);
     }
 
     private static void setMSIndexPPArtifactPaths() {

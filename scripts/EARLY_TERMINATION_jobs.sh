@@ -53,6 +53,7 @@ SEED="${SEED:-1}"
 CHECKPOINT_INTERVAL="${CHECKPOINT_INTERVAL:-64}"
 ACCURACY_TARGET="${ACCURACY_TARGET:-0.9}"
 MODEL_SCORE_THRESHOLD="${MODEL_SCORE_THRESHOLD:-0.5}"
+EXPORT_LOWER_BOUNDS="${EXPORT_LOWER_BOUNDS:-true}"
 RESUME="${RESUME:-true}"
 SBATCH_TIME="${SBATCH_TIME:-12:00:00}"
 SBATCH_PARTITION="${SBATCH_PARTITION:-}"
@@ -60,7 +61,7 @@ SBATCH_MEM="${SBATCH_MEM:-}"
 SBATCH_CPUS_PER_TASK="${SBATCH_CPUS_PER_TASK:-}"
 
 export JAR_PATH PYTHON_BIN TRAINING_ROOT RESULT_ROOT N_QUERIES N_OVERRIDE MAX_WORKERS SEED
-export CHECKPOINT_INTERVAL ACCURACY_TARGET MODEL_SCORE_THRESHOLD RESUME
+export CHECKPOINT_INTERVAL ACCURACY_TARGET MODEL_SCORE_THRESHOLD EXPORT_LOWER_BOUNDS RESUME
 
 if [[ ! -f "$JAR_PATH" ]]; then
     echo "Missing JAR at $JAR_PATH" >&2
@@ -261,7 +262,12 @@ run_dataset() {
             --skip-train
             --skip-benchmark
         )
+        if [[ "$EXPORT_LOWER_BOUNDS" == "true" ]]; then eval_cmd+=(--export-lower-bounds); fi
         if [[ "$RESUME" != "true" ]]; then eval_cmd+=(--force); fi
+        if [[ "$EXPORT_LOWER_BOUNDS" == "true" && -f "$private_root/.evaluation.done" \
+              && -z "$(find "$private_root/$dataset/eval_runs" -name lower_bounds.jsonl -type f -size +0c -print -quit 2>/dev/null)" ]]; then
+            rm -f "$private_root/.evaluation.done"
+        fi
         run_phase evaluation "$variant" "$private_root" "$runtime_csv" \
             "$private_root/.evaluation.done" "$private_root/evaluation_suite.log" \
             "${eval_cmd[@]}"

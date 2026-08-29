@@ -269,7 +269,7 @@ train_model() {
     else
         end="$(date +%s)"
         elapsed=$((end - start))
-        append_runtime "$runtime_csv" "model_training" "$variant" "" "" "" "$elapsed" failed "$log_path"
+        append_runtime "$runtime_csv" "model_training" "$variant" "" "" "" "" "$elapsed" failed "$log_path"
         return 1
     fi
 }

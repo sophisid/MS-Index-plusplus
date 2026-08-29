@@ -187,9 +187,9 @@ def noise_values_for(from_index: bool, args) -> List[float]:
     return args.ood_noise_values if not from_index else NOISE_VALUES
 
 
-def maybe_run_java(stage_dir: Path, log_name: str, cmd: List[str]) -> Dict[str, str]:
+def maybe_run_java(stage_dir: Path, log_name: str, cmd: List[str], required_outputs: Iterable[Path] = ()) -> Dict[str, str]:
     runs_csv = stage_dir / "runs.csv"
-    if not runs_csv.exists():
+    if not runs_csv.exists() or any(not output.exists() for output in required_outputs):
         run_command(cmd, stage_dir / log_name)
     return parse_single_run_csv(stage_dir)
 
@@ -316,6 +316,7 @@ def run_eval_combo(dataset: DatasetConfig, args, dataset_root: Path, model_path:
                    k: int, normalize: bool, from_index: bool, noise: float, experiment_id: int) -> Dict:
     key = combo_key(k, normalize, from_index, noise)
     stage_dir = dataset_root / "eval_runs" / key
+    lower_bound_trace_path = stage_dir / "lower_bounds.jsonl"
     extra_props = {
         "msindexpp.earlyTerminationEnabled": "true",
         "msindexpp.evaluationEnabled": "true",
@@ -324,6 +325,8 @@ def run_eval_combo(dataset: DatasetConfig, args, dataset_root: Path, model_path:
         "msindexpp.artifactsDir": str(dataset_root),
         "msindexpp.modelPath": str(model_path),
     }
+    if args.export_lower_bounds:
+        extra_props["msindexpp.lowerBoundTracePath"] = str(lower_bound_trace_path)
     row = maybe_run_java(
         stage_dir,
         "eval.log",
@@ -343,6 +346,7 @@ def run_eval_combo(dataset: DatasetConfig, args, dataset_root: Path, model_path:
             noise,
             "QUERY",
         ),
+        required_outputs=(lower_bound_trace_path,) if args.export_lower_bounds else (),
     )
     return {
         "dataset": dataset.name,
@@ -358,6 +362,7 @@ def run_eval_combo(dataset: DatasetConfig, args, dataset_root: Path, model_path:
         / max(parse_int(row, "msIndexPPEarlyStops"), 1),
         "query_time_ms": parse_query_time_avg_ms(row),
         "query_time_total_ms": parse_float(row, "queryTime"),
+        "lower_bound_trace_path": str(lower_bound_trace_path) if args.export_lower_bounds else "",
     }
 
 
@@ -715,10 +720,30 @@ def main() -> int:
     parser.add_argument("--n", type=int, default=None, help="Number of time series to load per dataset. If omitted, each dataset uses its default.")
     parser.add_argument("--max-m", type=int, default=100000)
     parser.add_argument("--n-queries", type=int, default=5)
+    parser.add_argument(
+        "--k-values",
+        nargs="+",
+        type=int,
+        choices=(1, 10, 100),
+        default=None,
+        help="Restrict the run to selected top-k values. Default: 1 10 100.",
+    )
+    parser.add_argument(
+        "--noise-values",
+        nargs="+",
+        type=float,
+        default=None,
+        help="Restrict indexed-query noise values, e.g. 0.0 0.5 0.9.",
+    )
     parser.add_argument("--seed", type=int, default=1)
     parser.add_argument("--checkpoint-interval", type=int, default=64)
     parser.add_argument("--accuracy-target", type=float, default=0.9)
     parser.add_argument("--model-score-threshold", type=float, default=0.5)
+    parser.add_argument(
+        "--export-lower-bounds",
+        action="store_true",
+        help="Export all R-tree leaf-entry lower bounds and tau_k for each evaluation query.",
+    )
     parser.add_argument(
         "--normalize-values",
         nargs="+",
@@ -753,7 +778,11 @@ def main() -> int:
         help="Noise values to run for queryFromIndexed=false OOD queries.",
     )
     args = parser.parse_args()
-    global NORMALIZE_VALUES
+    global K_VALUES, NORMALIZE_VALUES, NOISE_VALUES
+    if args.k_values is not None:
+        K_VALUES = args.k_values
+    if args.noise_values is not None:
+        NOISE_VALUES = [round(value, 1) for value in args.noise_values]
     if args.normalize_values is not None:
         NORMALIZE_VALUES = [value == "true" for value in args.normalize_values]
     if args.from_index_values is not None:

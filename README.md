@@ -125,3 +125,26 @@ bash scripts/HYBRID_jobs.sh --submit
 ```
 
 Run one dataset directly with `bash scripts/HYBRID_jobs.sh --dataset synthetic`.
+
+## Paper plots for AMS-Index and RC
+
+The following command creates threshold plots for the AMS-Index checkpoint
+traces, complete lower-bound histograms, and RC plots for the Stocks, Synthetic,
+and Weather query lengths used by the experiment scripts (`730`, `1024`, and
+`1488`, respectively):
+
+```bash
+/usr/bin/python3.10 scripts/plot_msindexpp_threshold_rc.py \
+  --early-root artifacts_early_termination/results \
+  --hybrid-root artifacts/hybrid_rc_sweep_n100_q10_retrained_v2 \
+  --normalize raw \
+  --reference-histograms
+```
+
+Use `--normalize normalized` or `--normalize both` for the normalized models.
+The reference histograms require evaluation runs created with
+`--export-lower-bounds` (the `EARLY_TERMINATION_jobs.sh` workload enables this
+by default). They use every R-tree leaf-entry lower bound and compute the
+pruned percentage directly from those values and each query's final `tau_k`.
+The script writes PNG/PDF figures and `plot_summary.csv`; missing combinations
+are reported and are not interpolated.
