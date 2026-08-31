@@ -7,7 +7,10 @@ import java.util.Map;
 public class DecisionFeatureVector {
     public static final String[] FEATURE_NAMES = {
             "k",
+            "avg_series_length",
             "std_series_length",
+            "total_subsequences",
+            "query_length_ratio",
             "query_mu_mean",
             "query_sigma2_mean",
             "query_abs_mean_mean",

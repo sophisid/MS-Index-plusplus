@@ -169,6 +169,20 @@ index_caches/*
 folder/*
 artifacts.zip
 artifacts_new/*
+artifacts_hybrid/*
+artifacts_hybrid.zip
+artifacts_early_termination.zip
+artifacts_early_termination/*
+scripts/plot_msindexpp_threshold_rc.py
+scripts/render_hybrid_grid_preview.py
+scripts/plot_hybrid_query_times.py
+scripts/generate_hybrid_training_tikz.py
+scripts/generate_hybrid_tikz.py
+scripts/generate_hybrid_tikz_v2.py
+scripts/generate_hybrid_tikz_batch.py
+scripts/generate_hybrid_pipeline_tikz.py
+scripts/generate_hybrid_focus_2panel_tikz.py
+scripts/generate_early_termination_tikz.py
 
 # Jens stuff
 data/

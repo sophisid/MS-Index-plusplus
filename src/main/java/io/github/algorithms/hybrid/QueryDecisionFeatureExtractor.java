@@ -4,18 +4,24 @@ import io.github.io.DataManager;
 
 import static io.github.utils.Parameters.K;
 import static io.github.utils.Parameters.N;
+import static io.github.utils.Parameters.qLen;
 import static io.github.utils.Parameters.selectedVariatesIdx;
 
 public class QueryDecisionFeatureExtractor {
+    private final double avgSeriesLength;
     private final double stdSeriesLength;
+    private final double totalSubsequences;
 
     public QueryDecisionFeatureExtractor() {
         final double[] lengths = new double[N];
+        double subsequenceCount = 0d;
         for (int i = 0; i < N; i++) {
             lengths[i] = DataManager.getM(i);
+            subsequenceCount += Math.max(0, DataManager.getM(i) - qLen + 1);
         }
-        double avgSeriesLength = mean(lengths);
+        avgSeriesLength = mean(lengths);
         stdSeriesLength = std(lengths, avgSeriesLength);
+        totalSubsequences = subsequenceCount;
     }
 
     public DecisionFeatureVector extract(double[][] query) {
@@ -47,17 +53,21 @@ public class QueryDecisionFeatureExtractor {
         }
 
         final double queryStdMean = mean(perChannelStd);
+        final double queryEnergyMean = mean(perChannelEnergy);
 
         return new DecisionFeatureVector(new double[]{
                 K,
+                avgSeriesLength,
                 stdSeriesLength,
+                totalSubsequences,
+                avgSeriesLength <= 0d ? 0d : query[0].length / avgSeriesLength,
                 mean(perChannelMean),
                 mean(perChannelVariance),
                 mean(perChannelAbsMean),
                 queryStdMean,
                 std(perChannelStd, queryStdMean),
-                mean(perChannelEnergy),
-                std(perChannelEnergy, mean(perChannelEnergy))
+                queryEnergyMean,
+                std(perChannelEnergy, queryEnergyMean)
         });
     }
 

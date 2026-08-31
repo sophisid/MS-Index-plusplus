@@ -2,6 +2,7 @@ package io.github.algorithms.msindexpp;
 
 import io.github.algorithms.Algorithm;
 import io.github.algorithms.msindexpp.ml.PortableGBDTModel;
+import io.github.algorithms.msindexpp.ml.LowerBoundTraceWriter;
 import io.github.algorithms.msindexpp.ml.SecondPassTraversal;
 import io.github.algorithms.msindexpp.ml.TrainingDataWriter;
 import io.github.algorithms.msindexshared.BoundedPriorityQueue;
@@ -138,6 +139,21 @@ public class MSIndexPP extends Algorithm {
         final ArrayList<CandidateMVSubsequence> initialTopK = firstPass(k, query, queryMBR);
         final double kThDistance = Math.max(0d, initialTopK.get(k - 1).totalDistance);
         Logger.getGlobal().info("[MS-Index] k-th distance after initial topK: " + kThDistance);
+
+        if (msIndexPPLowerBoundTracePath != null && !msIndexPPLowerBoundTracePath.isBlank()) {
+            try {
+                LowerBoundTraceWriter.appendQuery(
+                        msIndexPPLowerBoundTracePath,
+                        currQueryId,
+                        k,
+                        kThDistance,
+                        queryMBR,
+                        tree
+                );
+            } catch (IOException e) {
+                Logger.getGlobal().warning("[MS-IndexPP] Could not persist lower-bound trace: " + e.getMessage());
+            }
+        }
 
         final ArrayList<CandidateMVSubsequence> finalTopK = secondPass(k, query, queryMBR, kThDistance);
 

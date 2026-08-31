@@ -14,6 +14,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.Callable;
@@ -277,7 +278,12 @@ public class Hybrid extends Algorithm {
         return new QueryExecution(msIndex.kNN(K, query));
     }
 
-    private QueryExecution runEvaluatedQuery(int queryId, double[][] query, DecisionFeatureVector featureVector, long featureElapsed) {
+    private QueryExecution runEvaluatedQuery(
+            int queryId,
+            double[][] query,
+            DecisionFeatureVector featureVector,
+            long featureElapsed
+    ) {
         double rcEstimate = estimateRCViaSamples(query);
         long decisionStart = System.currentTimeMillis();
         AlgorithmType predictedAlgorithm = decisionModel == null
@@ -370,8 +376,9 @@ public class Hybrid extends Algorithm {
             return 1.0;
         }
 
-        double min = Double.POSITIVE_INFINITY;
-        double max = Double.NEGATIVE_INFINITY;
+        double[] sampledDistances = new double[RC_SERIES_SAMPLES * RC_WINDOW_SAMPLES];
+        double distanceSum = 0.0;
+        int sampledCount = 0;
 
         for (int s = 0; s < RC_SERIES_SAMPLES; s++) {
             int tsId = Parameters.random.nextInt(data.length);
@@ -386,19 +393,20 @@ public class Hybrid extends Algorithm {
                     dist2 += distance * distance;
                 }
                 double distance = Math.sqrt(dist2);
-                if (distance < min) {
-                    min = distance;
-                }
-                if (distance > max) {
-                    max = distance;
-                }
+                sampledDistances[sampledCount++] = distance;
+                distanceSum += distance;
             }
         }
 
-        if (!Double.isFinite(min) || !Double.isFinite(max)) {
+        if (sampledCount == 0 || !Double.isFinite(distanceSum)) {
             return 1.0;
         }
-        return max / Math.max(min, EPS);
+
+        Arrays.sort(sampledDistances, 0, sampledCount);
+        int rank = Math.min(Math.max(K, 1), sampledCount) - 1;
+        double kthNearestDistance = sampledDistances[rank];
+        double meanDistance = distanceSum / sampledCount;
+        return meanDistance / Math.max(kthNearestDistance, EPS);
     }
 
     private double windowDistance(double[] series, int start, double[] query, boolean zNormalize) {

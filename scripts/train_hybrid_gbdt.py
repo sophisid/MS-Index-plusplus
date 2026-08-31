@@ -10,7 +10,10 @@ import numpy as np
 
 FEATURE_NAMES = [
     "k",
+    "avg_series_length",
     "std_series_length",
+    "total_subsequences",
+    "query_length_ratio",
     "query_mu_mean",
     "query_sigma2_mean",
     "query_abs_mean_mean",
@@ -190,7 +193,7 @@ def main():
         print("ROC AUC: {:.4f}".format(roc_auc_score(y_test, y_proba)))
     except ValueError:
         print("ROC AUC: unavailable")
-    print(classification_report(y_test, y_pred, target_names=["MSINDEX", "MASS"]))
+    print(classification_report(y_test, y_pred, labels=[0, 1], target_names=["MSINDEX", "MASS"], zero_division=0))
 
     export_model(model, args.output, float(np.average(y_train, weights=sample_weight)))
     print("Saved portable model to {}".format(args.output))
