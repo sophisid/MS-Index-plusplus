@@ -55,6 +55,8 @@ ACCURACY_TARGET="${ACCURACY_TARGET:-0.9}"
 MODEL_SCORE_THRESHOLD="${MODEL_SCORE_THRESHOLD:-0.5}"
 EXPORT_LOWER_BOUNDS="${EXPORT_LOWER_BOUNDS:-true}"
 RESUME="${RESUME:-true}"
+CLEANUP_TRAINING_DATA="${CLEANUP_TRAINING_DATA:-true}"
+CLEANUP_TRAIN_RUNS="${CLEANUP_TRAIN_RUNS:-false}"
 SBATCH_TIME="${SBATCH_TIME:-12:00:00}"
 SBATCH_PARTITION="${SBATCH_PARTITION:-}"
 SBATCH_MEM="${SBATCH_MEM:-}"
@@ -62,6 +64,7 @@ SBATCH_CPUS_PER_TASK="${SBATCH_CPUS_PER_TASK:-}"
 
 export JAR_PATH PYTHON_BIN TRAINING_ROOT RESULT_ROOT N_QUERIES N_OVERRIDE MAX_WORKERS SEED
 export CHECKPOINT_INTERVAL ACCURACY_TARGET MODEL_SCORE_THRESHOLD EXPORT_LOWER_BOUNDS RESUME
+export CLEANUP_TRAINING_DATA CLEANUP_TRAIN_RUNS
 
 if [[ ! -f "$JAR_PATH" ]]; then
     echo "Missing JAR at $JAR_PATH" >&2
@@ -242,6 +245,8 @@ run_dataset() {
             --skip-eval
             --skip-benchmark
         )
+        if [[ "$CLEANUP_TRAINING_DATA" == "true" ]]; then train_cmd+=(--cleanup-training-data); fi
+        if [[ "$CLEANUP_TRAIN_RUNS" == "true" ]]; then train_cmd+=(--cleanup-train-runs); fi
         if [[ "$RESUME" != "true" ]]; then train_cmd+=(--force); fi
         run_phase training "$variant" "$private_root" "$runtime_csv" \
             "$private_root/.training.done" "$private_root/training_suite.log" \

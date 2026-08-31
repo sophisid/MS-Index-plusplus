@@ -55,6 +55,8 @@ NOISE_LIST="${NOISE_LIST:-0.0 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9}"
 EVAL_SEED="${EVAL_SEED:-9}"
 EVAL_MATRIX="${EVAL_MATRIX:-matched}"
 RESUME="${RESUME:-true}"
+CLEANUP_TRAINING_DATA="${CLEANUP_TRAINING_DATA:-true}"
+CLEANUP_TRAIN_RUNS="${CLEANUP_TRAIN_RUNS:-false}"
 SBATCH_TIME="${SBATCH_TIME:-12:00:00}"
 SBATCH_PARTITION="${SBATCH_PARTITION:-}"
 SBATCH_MEM="${SBATCH_MEM:-}"
@@ -62,6 +64,7 @@ SBATCH_CPUS_PER_TASK="${SBATCH_CPUS_PER_TASK:-}"
 
 export JAR_PATH PYTHON_BIN ARTIFACT_ROOT TRAINING_ROOT RESULT_ROOT N_OVERRIDE TRAIN_QUERIES EVAL_QUERIES
 export SEED_LIST NOISE_LIST EVAL_SEED EVAL_MATRIX RESUME
+export CLEANUP_TRAINING_DATA CLEANUP_TRAIN_RUNS
 
 if [[ ! -f "$JAR_PATH" ]]; then
     echo "Missing JAR at $JAR_PATH" >&2
@@ -245,6 +248,16 @@ if rows_written == 0:
 PY
 }
 
+cleanup_training_artifacts() {
+    local dataset_root="$1"
+    if [[ "$CLEANUP_TRAINING_DATA" == "true" ]]; then
+        rm -f "$dataset_root"/training/*.csv
+    fi
+    if [[ "$CLEANUP_TRAIN_RUNS" == "true" ]]; then
+        rm -rf "$dataset_root/training_runs"
+    fi
+}
+
 train_model() {
     local result_root="$1"
     local variant="$2"
@@ -422,6 +435,7 @@ run_dataset() {
     train_model "$result_dataset_root" normalized "$normalized_training"
     train_model "$result_dataset_root" joint "$joint_training"
     model_end="$(date +%s)"
+    cleanup_training_artifacts "$training_dataset_root"
 
     local variant eval_normalize
     evaluation_start="$(date +%s)"

@@ -113,6 +113,11 @@ def clear_file(path: Path) -> None:
         path.unlink()
 
 
+def clear_dir(path: Path) -> None:
+    if path.exists():
+        shutil.rmtree(path)
+
+
 def java_base_cmd(output_dir: Path, extra_props: Dict[str, str], algorithm: str, dataset: DatasetConfig,
                   n: int, max_m: int, k: int, normalize: bool, n_queries: int,
                   experiment_id: int, seed: int, query_from_index: bool, noise: float,
@@ -435,10 +440,8 @@ def train_dataset_model(dataset: DatasetConfig, args, experiment_start: int) -> 
         clear_file(trainer_metrics_path)
         clear_file(train_results_path)
         clear_file(training_runtime_path)
-        if training_parts_dir.exists():
-            shutil.rmtree(training_parts_dir)
-        if train_runs_dir.exists():
-            shutil.rmtree(train_runs_dir)
+        clear_dir(training_parts_dir)
+        clear_dir(train_runs_dir)
 
     dataset_root.mkdir(parents=True, exist_ok=True)
     training_parts_dir.mkdir(parents=True, exist_ok=True)
@@ -515,6 +518,12 @@ def train_dataset_model(dataset: DatasetConfig, args, experiment_start: int) -> 
         "model_bytes": model_path.stat().st_size if model_path.exists() else 0,
     }
     training_runtime_path.write_text(json.dumps(training_runtime, indent=2) + "\n", encoding="utf-8")
+
+    if args.cleanup_training_data:
+        clear_file(train_data_path)
+        clear_dir(training_parts_dir)
+    if args.cleanup_train_runs:
+        clear_dir(train_runs_dir)
     return experiment_id
 
 
@@ -763,6 +772,16 @@ def main() -> int:
     )
     parser.add_argument("--force", action="store_true", help="Delete cached stage outputs and rerun.")
     parser.add_argument("--max-workers", type=int, default=1)
+    parser.add_argument(
+        "--cleanup-training-data",
+        action="store_true",
+        help="Delete merged training-data.jsonl and training_parts after fitting the model.",
+    )
+    parser.add_argument(
+        "--cleanup-train-runs",
+        action="store_true",
+        help="Delete per-combo train_runs logs/CSVs after fitting the model.",
+    )
     parser.add_argument(
         "--from-index-values",
         nargs="+",
