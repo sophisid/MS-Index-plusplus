@@ -3,6 +3,7 @@
 import argparse
 import csv
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -19,6 +20,10 @@ ROOT = Path(__file__).resolve().parents[1]
 JAR_PATH = ROOT / "target" / "MS-Index-1.0-jar-with-dependencies.jar"
 TRAINER_PATH = ROOT / "scripts" / "train_msindexpp_gbdt.py"
 ARTIFACT_ROOT = ROOT / "artifacts" / "msindexpp_suite"
+# Interpreter used to run TRAINER_PATH (needs numpy/scikit-learn; the interpreter running this
+# orchestration script does not). Defaults to the project's local .venv; override with
+# TRAINER_PYTHON if that venv lives elsewhere or you're using a different environment.
+TRAINER_PYTHON = os.environ.get("TRAINER_PYTHON", str(ROOT / ".venv" / "bin" / "python"))
 
 K_VALUES = [1, 10, 100]
 NORMALIZE_VALUES = [False, True]
@@ -187,9 +192,15 @@ def noise_values_for(from_index: bool, args) -> List[float]:
     return args.ood_noise_values if not from_index else NOISE_VALUES
 
 
-def maybe_run_java(stage_dir: Path, log_name: str, cmd: List[str]) -> Dict[str, str]:
+def maybe_run_java(stage_dir: Path, log_name: str, cmd: List[str],
+                    required_outputs: Iterable[Path] = ()) -> Dict[str, str]:
+    # A stage is only cached if runs.csv AND every other artifact the stage promises to produce
+    # (e.g. a per-combo training-data JSONL) are still present. Checking runs.csv alone is not
+    # enough: those other artifacts can go missing independently (partial cleanup, manual
+    # deletion, a killed job) and silently produce empty downstream inputs on a "cached" resume.
     runs_csv = stage_dir / "runs.csv"
-    if not runs_csv.exists():
+    cache_valid = runs_csv.exists() and all(Path(p).exists() for p in required_outputs)
+    if not cache_valid:
         run_command(cmd, stage_dir / log_name)
     return parse_single_run_csv(stage_dir)
 
@@ -264,7 +275,7 @@ def run_training_combo(dataset: DatasetConfig, args, dataset_root: Path, train_d
                        k: int, normalize: bool, from_index: bool, noise: float, experiment_id: int) -> Dict:
     key = combo_key(k, normalize, from_index, noise)
     stage_dir = dataset_root / "train_runs" / key
-    cache_hit = (stage_dir / "runs.csv").exists()
+    cache_hit = stage_dir.joinpath("runs.csv").exists() and train_data_part_path.exists()
     extra_props = {
         "msindexpp.trainingEnabled": "true",
         "msindexpp.checkpointInterval": str(args.checkpoint_interval),
@@ -292,6 +303,7 @@ def run_training_combo(dataset: DatasetConfig, args, dataset_root: Path, train_d
             noise,
             "QUERY",
         ),
+        required_outputs=[train_data_part_path],
     )
     stage_wall_time_s = time.monotonic() - stage_start
     return {
@@ -485,7 +497,7 @@ def train_dataset_model(dataset: DatasetConfig, args, experiment_start: int) -> 
     trainer_start = time.monotonic()
     run_command(
         [
-            "/usr/bin/python3.10",
+            TRAINER_PYTHON,
             str(TRAINER_PATH),
             "--input",
             str(train_data_path),
@@ -762,6 +774,13 @@ def main() -> int:
     ARTIFACT_ROOT = args.artifact_root
     ensure_package()
     ARTIFACT_ROOT.mkdir(parents=True, exist_ok=True)
+
+    if not args.skip_train and not Path(TRAINER_PYTHON).exists():
+        raise FileNotFoundError(
+            f"Trainer interpreter not found: {TRAINER_PYTHON}\n"
+            "Create the project .venv (see CLAUDE.md) or set TRAINER_PYTHON to a Python "
+            "with numpy/scikit-learn installed."
+        )
 
     experiment_id = 1000
     summaries = []

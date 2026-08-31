@@ -22,15 +22,15 @@ SUBMIT="${SUBMIT:-0}"
 # name:path:qLen:defaultN[:maxLen]  max_m   — same specs as E1_E2_jobs.sh
 DATASETS=(
   "weather|weather:$WEATHER_DIR:1488:100:8784|16384"
-  "DuckDuckGeese|DuckDuckGeese:$UEA_BASE_DIR/DuckDuckGeese:54:50|10000"
-  "FaceDetection|FaceDetection:$UEA_BASE_DIR/FaceDetection:20:5890|10000"
-  "Heartbeat|Heartbeat:$UEA_BASE_DIR/Heartbeat:81:205|10000"
-  "InsectWingbeat|InsectWingbeat:$UEA_BASE_DIR/InsectWingbeat:2:25000|10000"
-  "MotorImagery|MotorImagery:$UEA_BASE_DIR/MotorImagery:600:278:600|10000"
-  "PEMS-SF|PEMS-SF:$UEA_BASE_DIR/PEMS-SF:28:267|10000"
-  "PhonemeSpectra|PhonemeSpectra:$UEA_BASE_DIR/PhonemeSpectra:43:3353|10000"
-  "SelfRegulationSCP1|SelfRegulationSCP1:$UEA_BASE_DIR/SelfRegulationSCP1:179:293|10000"
-  "SpokenArabicDigits|SpokenArabicDigits:$UEA_BASE_DIR/SpokenArabicDigits:4:6599|10000"
+  "DuckDuckGeese|DuckDuckGeese:$UEA_BASE_DIR/duckduckgeese:54:50|10000"
+  "FaceDetection|FaceDetection:$UEA_BASE_DIR/facedetection:20:5890|10000"
+  "Heartbeat|Heartbeat:$UEA_BASE_DIR/heartbeat:81:205|10000"
+  "InsectWingbeat|InsectWingbeat:$UEA_BASE_DIR/insectwingbeat:2:25000|10000"
+  "MotorImagery|MotorImagery:$UEA_BASE_DIR/motorimagery:600:278:600|10000"
+  "PEMS-SF|PEMS-SF:$UEA_BASE_DIR/pems-sf:28:267|10000"
+  "PhonemeSpectra|PhonemeSpectra:$UEA_BASE_DIR/phonemespectra:43:3353|10000"
+  "SelfRegulationSCP1|SelfRegulationSCP1:$UEA_BASE_DIR/selfregulationscp1:179:293|10000"
+  "SpokenArabicDigits|SpokenArabicDigits:$UEA_BASE_DIR/spokenarabicdigits:4:6599|10000"
 )
 
 quote_join() {
@@ -52,7 +52,7 @@ emit_job() {
   local -a extra_args=($extra_args_str)
 
   local -a inner_cmd=(
-    /usr/bin/python3.10 "$SUITE"
+    /sw/arch/RHEL9/EB_production/2025/software/Python/3.13.5-GCCcore-14.3.0/bin/python "$SUITE"
     --artifact-root "$ARTIFACT_ROOT"
     --dataset-spec "$spec"
     --max-m "$max_m"

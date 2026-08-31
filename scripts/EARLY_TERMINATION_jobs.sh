@@ -37,7 +37,7 @@ source "$SCRIPT_DIR/config.sh"
 [[ -n "$WIND_DIR_OVERRIDE" ]] && WIND_DIR="$WIND_DIR_OVERRIDE"
 
 JAR_PATH="${JAR_PATH:-$ROOT/target/MS-Index-1.0-jar-with-dependencies.jar}"
-PYTHON_BIN="${PYTHON_BIN:-/usr/bin/python3.10}"
+PYTHON_BIN="${PYTHON_BIN:-/sw/arch/RHEL9/EB_production/2025/software/Python/3.13.5-GCCcore-14.3.0/bin/python}"
 SUITE="$ROOT/scripts/run_msindexpp_dataset_suite.py"
 ARTIFACT_ROOT="${ARTIFACT_ROOT:-$ROOT/artifacts_early_termination}"
 TRAINING_ROOT="${TRAINING_ROOT:-$ARTIFACT_ROOT/training_private}"
@@ -79,36 +79,36 @@ fi
 dataset_config() {
     local dataset="$1"
     case "$dataset" in
-        ArticularyWordRecognition) printf '%s\t%s\t%s\t%s\t%s\n' "$dataset" "$UEA_BASE_DIR/ArticularyWordRecognition" 28 300 10000 ;;
-        AtrialFibrillation) printf '%s\t%s\t%s\t%s\t%s\n' "$dataset" "$UEA_BASE_DIR/AtrialFibrillation" 128 15 10000 ;;
-        BasicMotions) printf '%s\t%s\t%s\t%s\t%s\n' "$dataset" "$UEA_BASE_DIR/BasicMotions" 20 40 10000 ;;
-        CharacterTrajectories) printf '%s\t%s\t%s\t%s\t%s\n' "$dataset" "$UEA_BASE_DIR/CharacterTrajectories" 20 1436 10000 ;;
-        Cricket) printf '%s\t%s\t%s\t%s\t%s\n' "$dataset" "$UEA_BASE_DIR/Cricket" 239 108 10000 ;;
-        DuckDuckGeese) printf '%s\t%s\t%s\t%s\t%s\n' "$dataset" "$UEA_BASE_DIR/DuckDuckGeese" 54 50 10000 ;;
-        EigenWorms) printf '%s\t%s\t%s\t%s\t%s\n' "$dataset" "$UEA_BASE_DIR/EigenWorms" 3596 131 10000 ;;
-        Epilepsy) printf '%s\t%s\t%s\t%s\t%s\n' "$dataset" "$UEA_BASE_DIR/Epilepsy" 41 138 10000 ;;
-        ERing) printf '%s\t%s\t%s\t%s\t%s\n' "$dataset" "$UEA_BASE_DIR/ERing" 20 270 10000 ;;
-        EthanolConcentration) printf '%s\t%s\t%s\t%s\t%s\n' "$dataset" "$UEA_BASE_DIR/EthanolConcentration" 350 263 10000 ;;
-        FaceDetection) printf '%s\t%s\t%s\t%s\t%s\n' "$dataset" "$UEA_BASE_DIR/FaceDetection" 20 5890 10000 ;;
-        FingerMovements) printf '%s\t%s\t%s\t%s\t%s\n' "$dataset" "$UEA_BASE_DIR/FingerMovements" 20 316 10000 ;;
-        HandMovementDirection) printf '%s\t%s\t%s\t%s\t%s\n' "$dataset" "$UEA_BASE_DIR/HandMovementDirection" 80 160 10000 ;;
-        Handwriting) printf '%s\t%s\t%s\t%s\t%s\n' "$dataset" "$UEA_BASE_DIR/Handwriting" 30 850 10000 ;;
-        Heartbeat) printf '%s\t%s\t%s\t%s\t%s\n' "$dataset" "$UEA_BASE_DIR/Heartbeat" 81 205 10000 ;;
-        InsectWingbeat) printf '%s\t%s\t%s\t%s\t%s\n' "$dataset" "$UEA_BASE_DIR/InsectWingbeat" 2 25000 10000 ;;
-        JapaneseVowels) printf '%s\t%s\t%s\t%s\t%s\n' "$dataset" "$UEA_BASE_DIR/JapaneseVowels" 7 370 10000 ;;
-        Libras) printf '%s\t%s\t%s\t%s\t%s\n' "$dataset" "$UEA_BASE_DIR/Libras" 20 180 10000 ;;
-        LSST) printf '%s\t%s\t%s\t%s\t%s\n' "$dataset" "$UEA_BASE_DIR/LSST" 20 2466 10000 ;;
-        MotorImagery) printf '%s\t%s\t%s\t%s\t%s\n' "$dataset" "$UEA_BASE_DIR/MotorImagery" 600 278 10000 ;;
-        NATOPS) printf '%s\t%s\t%s\t%s\t%s\n' "$dataset" "$UEA_BASE_DIR/NATOPS" 20 180 10000 ;;
-        PEMS-SF) printf '%s\t%s\t%s\t%s\t%s\n' "$dataset" "$UEA_BASE_DIR/PEMS-SF" 28 267 10000 ;;
-        PenDigits) printf '%s\t%s\t%s\t%s\t%s\n' "$dataset" "$UEA_BASE_DIR/PenDigits" 8 7494 10000 ;;
-        PhonemeSpectra) printf '%s\t%s\t%s\t%s\t%s\n' "$dataset" "$UEA_BASE_DIR/PhonemeSpectra" 43 3353 10000 ;;
-        RacketSports) printf '%s\t%s\t%s\t%s\t%s\n' "$dataset" "$UEA_BASE_DIR/RacketSports" 20 152 10000 ;;
-        SelfRegulationSCP1) printf '%s\t%s\t%s\t%s\t%s\n' "$dataset" "$UEA_BASE_DIR/SelfRegulationSCP1" 179 293 10000 ;;
-        SelfRegulationSCP2) printf '%s\t%s\t%s\t%s\t%s\n' "$dataset" "$UEA_BASE_DIR/SelfRegulationSCP2" 230 200 10000 ;;
-        SpokenArabicDigits) printf '%s\t%s\t%s\t%s\t%s\n' "$dataset" "$UEA_BASE_DIR/SpokenArabicDigits" 4 6599 10000 ;;
-        StandWalkJump) printf '%s\t%s\t%s\t%s\t%s\n' "$dataset" "$UEA_BASE_DIR/StandWalkJump" 500 15 10000 ;;
-        UWaveGestureLibrary) printf '%s\t%s\t%s\t%s\t%s\n' "$dataset" "$UEA_BASE_DIR/UWaveGestureLibrary" 63 320 10000 ;;
+        ArticularyWordRecognition) printf '%s\t%s\t%s\t%s\t%s\n' "$dataset" "$UEA_BASE_DIR/articularywordrecognition" 28 300 10000 ;;
+        AtrialFibrillation) printf '%s\t%s\t%s\t%s\t%s\n' "$dataset" "$UEA_BASE_DIR/atrialfibrillation" 128 15 10000 ;;
+        BasicMotions) printf '%s\t%s\t%s\t%s\t%s\n' "$dataset" "$UEA_BASE_DIR/basicmotions" 20 40 10000 ;;
+        CharacterTrajectories) printf '%s\t%s\t%s\t%s\t%s\n' "$dataset" "$UEA_BASE_DIR/charactertrajectories" 20 1436 10000 ;;
+        Cricket) printf '%s\t%s\t%s\t%s\t%s\n' "$dataset" "$UEA_BASE_DIR/cricket" 239 108 10000 ;;
+        DuckDuckGeese) printf '%s\t%s\t%s\t%s\t%s\n' "$dataset" "$UEA_BASE_DIR/duckduckgeese" 54 50 10000 ;;
+        EigenWorms) printf '%s\t%s\t%s\t%s\t%s\n' "$dataset" "$UEA_BASE_DIR/eigenworms" 3596 131 10000 ;;
+        Epilepsy) printf '%s\t%s\t%s\t%s\t%s\n' "$dataset" "$UEA_BASE_DIR/epilepsy" 41 138 10000 ;;
+        ERing) printf '%s\t%s\t%s\t%s\t%s\n' "$dataset" "$UEA_BASE_DIR/ering" 20 270 10000 ;;
+        EthanolConcentration) printf '%s\t%s\t%s\t%s\t%s\n' "$dataset" "$UEA_BASE_DIR/ethanolconcentration" 350 263 10000 ;;
+        FaceDetection) printf '%s\t%s\t%s\t%s\t%s\n' "$dataset" "$UEA_BASE_DIR/facedetection" 20 5890 10000 ;;
+        FingerMovements) printf '%s\t%s\t%s\t%s\t%s\n' "$dataset" "$UEA_BASE_DIR/fingermovements" 20 316 10000 ;;
+        HandMovementDirection) printf '%s\t%s\t%s\t%s\t%s\n' "$dataset" "$UEA_BASE_DIR/handmovementdirection" 80 160 10000 ;;
+        Handwriting) printf '%s\t%s\t%s\t%s\t%s\n' "$dataset" "$UEA_BASE_DIR/handwriting" 30 850 10000 ;;
+        Heartbeat) printf '%s\t%s\t%s\t%s\t%s\n' "$dataset" "$UEA_BASE_DIR/heartbeat" 81 205 10000 ;;
+        InsectWingbeat) printf '%s\t%s\t%s\t%s\t%s\n' "$dataset" "$UEA_BASE_DIR/insectwingbeat" 2 25000 10000 ;;
+        JapaneseVowels) printf '%s\t%s\t%s\t%s\t%s\n' "$dataset" "$UEA_BASE_DIR/japanesevowels" 7 370 10000 ;;
+        Libras) printf '%s\t%s\t%s\t%s\t%s\n' "$dataset" "$UEA_BASE_DIR/libras" 20 180 10000 ;;
+        LSST) printf '%s\t%s\t%s\t%s\t%s\n' "$dataset" "$UEA_BASE_DIR/lsst" 20 2466 10000 ;;
+        MotorImagery) printf '%s\t%s\t%s\t%s\t%s\n' "$dataset" "$UEA_BASE_DIR/motorimagery" 600 278 10000 ;;
+        NATOPS) printf '%s\t%s\t%s\t%s\t%s\n' "$dataset" "$UEA_BASE_DIR/natops" 20 180 10000 ;;
+        PEMS-SF) printf '%s\t%s\t%s\t%s\t%s\n' "$dataset" "$UEA_BASE_DIR/pems-sf" 28 267 10000 ;;
+        PenDigits) printf '%s\t%s\t%s\t%s\t%s\n' "$dataset" "$UEA_BASE_DIR/pendigits" 8 7494 10000 ;;
+        PhonemeSpectra) printf '%s\t%s\t%s\t%s\t%s\n' "$dataset" "$UEA_BASE_DIR/phonemespectra" 43 3353 10000 ;;
+        RacketSports) printf '%s\t%s\t%s\t%s\t%s\n' "$dataset" "$UEA_BASE_DIR/racketsports" 20 152 10000 ;;
+        SelfRegulationSCP1) printf '%s\t%s\t%s\t%s\t%s\n' "$dataset" "$UEA_BASE_DIR/selfregulationscp1" 179 293 10000 ;;
+        SelfRegulationSCP2) printf '%s\t%s\t%s\t%s\t%s\n' "$dataset" "$UEA_BASE_DIR/selfregulationscp2" 230 200 10000 ;;
+        SpokenArabicDigits) printf '%s\t%s\t%s\t%s\t%s\n' "$dataset" "$UEA_BASE_DIR/spokenarabicdigits" 4 6599 10000 ;;
+        StandWalkJump) printf '%s\t%s\t%s\t%s\t%s\n' "$dataset" "$UEA_BASE_DIR/standwalkjump" 500 15 10000 ;;
+        UWaveGestureLibrary) printf '%s\t%s\t%s\t%s\t%s\n' "$dataset" "$UEA_BASE_DIR/uwavegesturelibrary" 63 320 10000 ;;
         synthetic) printf '%s\t%s\t%s\t%s\t%s\n' "$dataset" "$SYNTHETIC_DIR" 1024 100 4096 ;;
         weather) printf '%s\t%s\t%s\t%s\t%s\n' "$dataset" "$WEATHER_DIR" 1488 100 16384 ;;
         stocks) printf '%s\t%s\t%s\t%s\t%s\n' "$dataset" "$STOCKS_DIR" 730 100 16384 ;;

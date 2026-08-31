@@ -16,7 +16,7 @@ ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 ARTIFACT_ROOT="$ROOT/artifacts/msindexpp_suite"
 CAL="$SCRIPT_DIR/calibrate_conformal.py"
 
-RUN="/usr/bin/python3.10 $CAL --delta 0.1"
+RUN="/sw/arch/RHEL9/EB_production/2025/software/Python/3.13.5-GCCcore-14.3.0/bin/python $CAL --delta 0.1"
 
 for DATASET in \
     ArticularyWordRecognition AtrialFibrillation BasicMotions CharacterTrajectories \
