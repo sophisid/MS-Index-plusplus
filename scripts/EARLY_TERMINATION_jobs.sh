@@ -57,7 +57,7 @@ EXPORT_LOWER_BOUNDS="${EXPORT_LOWER_BOUNDS:-true}"
 RESUME="${RESUME:-true}"
 CLEANUP_TRAINING_DATA="${CLEANUP_TRAINING_DATA:-true}"
 CLEANUP_TRAIN_RUNS="${CLEANUP_TRAIN_RUNS:-false}"
-SBATCH_TIME="${SBATCH_TIME:-12:00:00}"
+SBATCH_TIME="${SBATCH_TIME:-48:00:00}"
 SBATCH_PARTITION="${SBATCH_PARTITION:-}"
 SBATCH_MEM="${SBATCH_MEM:-}"
 SBATCH_CPUS_PER_TASK="${SBATCH_CPUS_PER_TASK:-}"
@@ -334,7 +334,7 @@ usage() {
     sed -n '1,26p' "$0"
     echo
     echo "Options:"
-    echo "  --submit              Submit one Slurm job per dataset (12h default)."
+    echo "  --submit              Submit one Slurm job per dataset (48h default)."
     echo "  --print-commands      Print the sbatch commands without submitting."
     echo "  --dataset NAME        Run one dataset inside the current Slurm job."
     echo
