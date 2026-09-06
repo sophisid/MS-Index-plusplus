@@ -262,11 +262,9 @@ public class Hybrid extends Algorithm {
     }
 
     private QueryExecution runPredictedQuery(double[][] query, DecisionFeatureVector featureVector) {
-        long decisionStart = System.currentTimeMillis();
-        AlgorithmType selectedAlgorithm = decisionModel == null
-                ? AlgorithmType.MSINDEX
-                : decisionModel.predict(featureVector);
-        long decisionElapsed = System.currentTimeMillis() - decisionStart;
+        long decisionStart = System.nanoTime();
+        AlgorithmType selectedAlgorithm = predictWithTiming(featureVector);
+        long decisionElapsed = (System.nanoTime() - decisionStart) / 1_000_000L;
         totalDecisionTimeMs += decisionElapsed;
 
         Logger.getGlobal().info("[Hybrid] Decision time: " + decisionElapsed + "ms");
@@ -285,11 +283,9 @@ public class Hybrid extends Algorithm {
             long featureElapsed
     ) {
         double rcEstimate = estimateRCViaSamples(query);
-        long decisionStart = System.currentTimeMillis();
-        AlgorithmType predictedAlgorithm = decisionModel == null
-                ? AlgorithmType.MSINDEX
-                : decisionModel.predict(featureVector);
-        long decisionElapsed = System.currentTimeMillis() - decisionStart;
+        long decisionStart = System.nanoTime();
+        AlgorithmType predictedAlgorithm = predictWithTiming(featureVector);
+        long decisionElapsed = (System.nanoTime() - decisionStart) / 1_000_000L;
         totalDecisionTimeMs += decisionElapsed;
 
         TimedResult massResult = timeQuery(() -> mass.kNN(K, query));
@@ -346,6 +342,19 @@ public class Hybrid extends Algorithm {
         ));
 
         return new QueryExecution(predictedResult.results);
+    }
+
+    private AlgorithmType predictWithTiming(DecisionFeatureVector featureVector) {
+        if (decisionModel == null) {
+            return AlgorithmType.MSINDEX;
+        }
+        long start = System.nanoTime();
+        try {
+            return decisionModel.predict(featureVector);
+        } finally {
+            Parameters.hybridModelInferenceTimeNs += System.nanoTime() - start;
+            Parameters.hybridModelInferenceCalls++;
+        }
     }
 
     private static TimedResult timeQuery(QueryRunner runner) {

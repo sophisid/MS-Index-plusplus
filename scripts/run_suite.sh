@@ -2,7 +2,7 @@
 # run_suite.sh
 #
 # Runs training, evaluation, and timing benchmark (MSINDEX, MASS, MSINDEXPP)
-# for all 34 datasets. Per-dataset results land in:
+# for the selected rerun datasets only. Per-dataset results land in:
 #   artifacts/msindexpp_suite/<dataset>/
 # Combined summary:
 #   artifacts/msindexpp_suite/dataset_summary.csv
@@ -10,8 +10,8 @@
 #   artifacts/msindexpp_suite/<dataset>/training_runtime.json
 #
 # Usage: bash run_suite.sh [--datasets all|custom] [--force]
-#   --datasets all     Run all 34 datasets (default)
-#   --datasets custom  Run only the 4 custom datasets (synthetic, weather, stocks, wind)
+#   --datasets all|custom  Kept for CLI compatibility; both run the selected
+#                          rerun datasets from config.sh.
 #   --force            Clears all cached results and reruns from scratch.
 
 set -uo pipefail
@@ -24,6 +24,7 @@ source "$SCRIPT_DIR/config.sh"
 ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 SUITE="$SCRIPT_DIR/run_msindexpp_dataset_suite.py"
 ARTIFACT_ROOT="$ROOT/artifacts/msindexpp_suite"
+PYTHON_BIN="${PYTHON_BIN:-/usr/bin/python3.10}"
 STAMP="$(date '+%Y%m%d_%H%M%S')"
 LOG_DIR="$ARTIFACT_ROOT/suite_${STAMP}"
 mkdir -p "$LOG_DIR"
@@ -59,7 +60,7 @@ run_dataset() {
     local max_m="$3"  # maximum series length to load
     local log_file="$LOG_DIR/${name}.log"
     log "START $name"
-    if /usr/bin/python3.10 "$SUITE" \
+if "$PYTHON_BIN" "$SUITE" \
         --artifact-root "$ARTIFACT_ROOT" \
         --dataset-spec "$spec" \
         --max-m "$max_m" \
@@ -75,50 +76,16 @@ run_dataset() {
     fi
 }
 
-# --- 30 UEA Multivariate Datasets ---
-if [[ "$RUN_MODE" == "all" ]]; then
-# spec format: name:path:qLen:defaultN  (maxLen added where series = query length)
-run_dataset "ArticularyWordRecognition" "ArticularyWordRecognition:$UEA_BASE_DIR/ArticularyWordRecognition:28:300"    10000
-run_dataset "AtrialFibrillation"        "AtrialFibrillation:$UEA_BASE_DIR/AtrialFibrillation:128:15"                10000
-run_dataset "BasicMotions"              "BasicMotions:$UEA_BASE_DIR/BasicMotions:20:40"                              10000
-run_dataset "CharacterTrajectories"     "CharacterTrajectories:$UEA_BASE_DIR/CharacterTrajectories:20:1436"          10000
-run_dataset "Cricket"                   "Cricket:$UEA_BASE_DIR/Cricket:239:108"                                      10000
-run_dataset "DuckDuckGeese"             "DuckDuckGeese:$UEA_BASE_DIR/DuckDuckGeese:54:50"                            10000
-run_dataset "EigenWorms"                "EigenWorms:$UEA_BASE_DIR/EigenWorms:3596:131:3596"                          10000
-run_dataset "Epilepsy"                  "Epilepsy:$UEA_BASE_DIR/Epilepsy:41:138"                                     10000
-run_dataset "ERing"                     "ERing:$UEA_BASE_DIR/ERing:20:270"                                           10000
-run_dataset "EthanolConcentration"      "EthanolConcentration:$UEA_BASE_DIR/EthanolConcentration:350:263"            10000
-run_dataset "FaceDetection"             "FaceDetection:$UEA_BASE_DIR/FaceDetection:20:5890"                          10000
-run_dataset "FingerMovements"           "FingerMovements:$UEA_BASE_DIR/FingerMovements:20:316"                       10000
-run_dataset "HandMovementDirection"     "HandMovementDirection:$UEA_BASE_DIR/HandMovementDirection:80:160"            10000
-run_dataset "Handwriting"               "Handwriting:$UEA_BASE_DIR/Handwriting:30:850"                               10000
-run_dataset "Heartbeat"                 "Heartbeat:$UEA_BASE_DIR/Heartbeat:81:205"                                   10000
-run_dataset "InsectWingbeat"            "InsectWingbeat:$UEA_BASE_DIR/InsectWingbeat:2:25000"                        10000
-run_dataset "JapaneseVowels"            "JapaneseVowels:$UEA_BASE_DIR/JapaneseVowels:7:370"                          10000
-run_dataset "Libras"                    "Libras:$UEA_BASE_DIR/Libras:20:180"                                         10000
-run_dataset "LSST"                      "LSST:$UEA_BASE_DIR/LSST:20:2466"                                            10000
-run_dataset "MotorImagery"              "MotorImagery:$UEA_BASE_DIR/MotorImagery:600:278:600"                         10000
-run_dataset "NATOPS"                    "NATOPS:$UEA_BASE_DIR/NATOPS:20:180"                                          10000
-run_dataset "PEMS-SF"                   "PEMS-SF:$UEA_BASE_DIR/PEMS-SF:28:267"                                        10000
-run_dataset "PenDigits"                 "PenDigits:$UEA_BASE_DIR/PenDigits:8:7494"                                    10000
-run_dataset "PhonemeSpectra"            "PhonemeSpectra:$UEA_BASE_DIR/PhonemeSpectra:43:3353"                         10000
-run_dataset "RacketSports"              "RacketSports:$UEA_BASE_DIR/RacketSports:20:152"                              10000
-run_dataset "SelfRegulationSCP1"        "SelfRegulationSCP1:$UEA_BASE_DIR/SelfRegulationSCP1:179:293"                10000
-run_dataset "SelfRegulationSCP2"        "SelfRegulationSCP2:$UEA_BASE_DIR/SelfRegulationSCP2:230:200"                10000
-run_dataset "SpokenArabicDigits"        "SpokenArabicDigits:$UEA_BASE_DIR/SpokenArabicDigits:4:6599"                 10000
-run_dataset "StandWalkJump"             "StandWalkJump:$UEA_BASE_DIR/StandWalkJump:500:15:500"                        10000
-run_dataset "UWaveGestureLibrary"       "UWaveGestureLibrary:$UEA_BASE_DIR/UWaveGestureLibrary:63:320"               10000
-fi # RUN_MODE == all
-
-# --- 4 Custom Datasets ---
+# --- Selected rerun datasets ---
 run_dataset "synthetic" "synthetic:$SYNTHETIC_DIR:1024:100:4096"  4096
 run_dataset "weather"   "weather:$WEATHER_DIR:1488:100:8784"       16384
 run_dataset "stocks"    "stocks:$STOCKS_DIR:730:100:22335"         16384
 run_dataset "wind"      "wind:$WIND_DIR:1800:1:432000"             32768
+run_dataset "DuckDuckGeese" "DuckDuckGeese:$UEA_BASE_DIR/DuckDuckGeese:54:50:10000" 10000
 
 # --- Training time summary ---
 log "Training time per dataset:"
-python3 - "$ARTIFACT_ROOT" <<'PYEOF'
+"$PYTHON_BIN" - "$ARTIFACT_ROOT" <<'PYEOF
 import json, sys
 from pathlib import Path
 

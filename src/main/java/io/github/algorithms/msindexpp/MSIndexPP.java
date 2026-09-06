@@ -2,6 +2,7 @@ package io.github.algorithms.msindexpp;
 
 import io.github.algorithms.Algorithm;
 import io.github.algorithms.msindexpp.ml.PortableGBDTModel;
+import io.github.algorithms.msindexpp.ml.ApproximateEvaluationTraceWriter;
 import io.github.algorithms.msindexpp.ml.LowerBoundTraceWriter;
 import io.github.algorithms.msindexpp.ml.SecondPassTraversal;
 import io.github.algorithms.msindexpp.ml.TrainingDataWriter;
@@ -220,6 +221,8 @@ public class MSIndexPP extends Algorithm {
     }
 
     private ArrayList<CandidateMVSubsequence> secondPassWithEvaluation(int k, double[][] query, MinimumBoundingRectangle queryMBR, double threshold) {
+        final long inferenceTimeBefore = msIndexPPModelInferenceTimeNs;
+        final long inferenceCallsBefore = msIndexPPModelInferenceCalls;
         long start = System.currentTimeMillis();
         final SecondPassTraversal.TraversalResult exactTraversal = SecondPassTraversal.traverse(
                 tree,
@@ -255,6 +258,26 @@ public class MSIndexPP extends Algorithm {
         if (earlyTraversal.stoppedEarly) {
             msIndexPPEarlyStops.incrementAndGet();
             msIndexPPEarlyTerminationSteps.addAndGet(earlyTraversal.stepsExecuted);
+        }
+
+        if (msIndexPPEvaluationTracePath != null && !msIndexPPEvaluationTracePath.isBlank()) {
+            try {
+                ApproximateEvaluationTraceWriter.appendQuery(
+                        msIndexPPEvaluationTracePath,
+                        currQueryId,
+                        k,
+                        msIndexPPTargetRecall,
+                        achievedAccuracy,
+                        earlyTraversal.stoppedEarly,
+                        exactTopKDist,
+                        earlyTopKDist,
+                        threshold,
+                        msIndexPPModelInferenceTimeNs - inferenceTimeBefore,
+                        msIndexPPModelInferenceCalls - inferenceCallsBefore
+                );
+            } catch (IOException e) {
+                Logger.getGlobal().warning("[MS-IndexPP] Could not persist evaluation trace: " + e.getMessage());
+            }
         }
 
         Logger.getGlobal().info(String.format(
@@ -305,6 +328,21 @@ public class MSIndexPP extends Algorithm {
             return null;
         }
 
+        if (model.isTargetIndependent()) {
+            final double targetRecall = msIndexPPTargetRecall;
+            return new SecondPassTraversal.CheckpointDecider() {
+                @Override
+                public double score(io.github.algorithms.msindexpp.ml.TraversalFeatureSnapshot snapshot) {
+                    return predictModelScore(model, snapshot);
+                }
+
+                @Override
+                public boolean shouldStop(io.github.algorithms.msindexpp.ml.TraversalFeatureSnapshot snapshot, double score) {
+                    return score >= targetRecall;
+                }
+            };
+        }
+
         final double scoreThreshold = model.getConformalThreshold() != null
                 ? model.getConformalThreshold()
                 : msIndexPPModelScoreThreshold;
@@ -312,7 +350,7 @@ public class MSIndexPP extends Algorithm {
         return new SecondPassTraversal.CheckpointDecider() {
             @Override
             public double score(io.github.algorithms.msindexpp.ml.TraversalFeatureSnapshot snapshot) {
-                return model.predictProbability(snapshot);
+                return predictModelScore(model, snapshot);
             }
 
             @Override
@@ -320,6 +358,19 @@ public class MSIndexPP extends Algorithm {
                 return score >= scoreThreshold;
             }
         };
+    }
+
+    private double predictModelScore(PortableGBDTModel model,
+                                     io.github.algorithms.msindexpp.ml.TraversalFeatureSnapshot snapshot) {
+        long start = System.nanoTime();
+        try {
+            return model.isTargetIndependent()
+                    ? model.predictRecall(snapshot)
+                    : model.predictProbability(snapshot);
+        } finally {
+            msIndexPPModelInferenceTimeNs += System.nanoTime() - start;
+            msIndexPPModelInferenceCalls++;
+        }
     }
 
     private PortableGBDTModel getEarlyTerminationModel() {

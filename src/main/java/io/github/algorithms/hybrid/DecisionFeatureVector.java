@@ -17,7 +17,11 @@ public class DecisionFeatureVector {
             "query_std_mean",
             "query_std_std",
             "query_energy_mean",
-            "query_energy_std"
+            "query_energy_std",
+            "query_range_mean",
+            "query_range_std",
+            "query_diff_energy_mean",
+            "query_diff_energy_std"
     };
 
     private final double[] values;

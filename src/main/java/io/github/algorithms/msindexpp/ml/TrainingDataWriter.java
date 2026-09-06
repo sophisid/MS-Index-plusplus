@@ -33,6 +33,7 @@ public class TrainingDataWriter {
                 node.put("query_id", queryId);
                 node.put("label", row.label ? 1 : 0);
                 node.put("achieved_accuracy", row.achievedAccuracy);
+                node.put("actual_recall", row.achievedAccuracy);
                 node.put("candidate_count_at_checkpoint", row.candidateCountAtCheckpoint);
                 node.put("final_candidate_count", row.finalCandidateCount);
                 for (var entry : row.snapshot.toFeatureMap().entrySet()) {

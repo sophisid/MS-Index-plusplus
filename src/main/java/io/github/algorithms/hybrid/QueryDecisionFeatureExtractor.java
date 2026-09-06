@@ -30,16 +30,30 @@ public class QueryDecisionFeatureExtractor {
         final double[] perChannelAbsMean = new double[selectedVariatesIdx.length];
         final double[] perChannelStd = new double[selectedVariatesIdx.length];
         final double[] perChannelEnergy = new double[selectedVariatesIdx.length];
+        final double[] perChannelRange = new double[selectedVariatesIdx.length];
+        final double[] perChannelDiffEnergy = new double[selectedVariatesIdx.length];
 
         for (int i = 0; i < selectedVariatesIdx.length; i++) {
             final double[] channel = query[selectedVariatesIdx[i]];
             double sum = 0d;
             double sumSquares = 0d;
             double sumAbs = 0d;
-            for (double value : channel) {
+            double min = Double.POSITIVE_INFINITY;
+            double max = Double.NEGATIVE_INFINITY;
+            double sumSquaredDiffs = 0d;
+            double previous = 0d;
+            for (int j = 0; j < channel.length; j++) {
+                final double value = channel[j];
                 sum += value;
                 sumSquares += value * value;
                 sumAbs += Math.abs(value);
+                min = Math.min(min, value);
+                max = Math.max(max, value);
+                if (j > 0) {
+                    final double difference = value - previous;
+                    sumSquaredDiffs += difference * difference;
+                }
+                previous = value;
             }
 
             final double channelMean = sum / channel.length;
@@ -50,10 +64,14 @@ public class QueryDecisionFeatureExtractor {
             perChannelAbsMean[i] = sumAbs / channel.length;
             perChannelStd[i] = Math.sqrt(variance);
             perChannelEnergy[i] = sumSquares / channel.length;
+            perChannelRange[i] = max - min;
+            perChannelDiffEnergy[i] = channel.length <= 1 ? 0d : sumSquaredDiffs / (channel.length - 1);
         }
 
         final double queryStdMean = mean(perChannelStd);
         final double queryEnergyMean = mean(perChannelEnergy);
+        final double queryRangeMean = mean(perChannelRange);
+        final double queryDiffEnergyMean = mean(perChannelDiffEnergy);
 
         return new DecisionFeatureVector(new double[]{
                 K,
@@ -67,7 +85,11 @@ public class QueryDecisionFeatureExtractor {
                 queryStdMean,
                 std(perChannelStd, queryStdMean),
                 queryEnergyMean,
-                std(perChannelEnergy, queryEnergyMean)
+                std(perChannelEnergy, queryEnergyMean),
+                queryRangeMean,
+                std(perChannelRange, queryRangeMean),
+                queryDiffEnergyMean,
+                std(perChannelDiffEnergy, queryDiffEnergyMean)
         });
     }
 

@@ -52,8 +52,14 @@ MAX_WORKERS="${MAX_WORKERS:-1}"
 SEED="${SEED:-1}"
 CHECKPOINT_INTERVAL="${CHECKPOINT_INTERVAL:-64}"
 ACCURACY_TARGET="${ACCURACY_TARGET:-0.9}"
+TARGET_RECALL="${TARGET_RECALL:-0.9}"
 MODEL_SCORE_THRESHOLD="${MODEL_SCORE_THRESHOLD:-0.5}"
-EXPORT_LOWER_BOUNDS="${EXPORT_LOWER_BOUNDS:-true}"
+MODEL_TYPE="${MODEL_TYPE:-target_specific_classifier}"
+K_LIST="${K_LIST:-1 10 100}"
+NOISE_LIST="${NOISE_LIST:-0.1 0.3 0.5 0.7 0.9}"
+EXPORT_LOWER_BOUNDS="${EXPORT_LOWER_BOUNDS:-false}"
+EXPORT_EVALUATION_TRACE="${EXPORT_EVALUATION_TRACE:-false}"
+TRAIN_ONLY="${TRAIN_ONLY:-false}"
 RESUME="${RESUME:-true}"
 CLEANUP_TRAINING_DATA="${CLEANUP_TRAINING_DATA:-false}"
 CLEANUP_TRAIN_RUNS="${CLEANUP_TRAIN_RUNS:-false}"
@@ -63,7 +69,8 @@ SBATCH_MEM="${SBATCH_MEM:-}"
 SBATCH_CPUS_PER_TASK="${SBATCH_CPUS_PER_TASK:-}"
 
 export JAR_PATH PYTHON_BIN TRAINING_ROOT RESULT_ROOT N_QUERIES N_OVERRIDE MAX_WORKERS SEED
-export CHECKPOINT_INTERVAL ACCURACY_TARGET MODEL_SCORE_THRESHOLD EXPORT_LOWER_BOUNDS RESUME
+export CHECKPOINT_INTERVAL ACCURACY_TARGET TARGET_RECALL MODEL_SCORE_THRESHOLD MODEL_TYPE
+export K_LIST NOISE_LIST EXPORT_LOWER_BOUNDS EXPORT_EVALUATION_TRACE TRAIN_ONLY RESUME
 export CLEANUP_TRAINING_DATA CLEANUP_TRAIN_RUNS
 
 if [[ ! -f "$JAR_PATH" ]]; then
@@ -80,8 +87,19 @@ if ! "$PYTHON_BIN" --version >/dev/null 2>&1; then
     exit 1
 fi
 
+read -r -a K_VALUES <<< "$K_LIST"
+read -r -a NOISE_VALUES <<< "$NOISE_LIST"
+case "$MODEL_TYPE" in
+    target_specific_classifier|target_independent_regressor) ;;
+    *) echo "MODEL_TYPE must be target_specific_classifier or target_independent_regressor, got '$MODEL_TYPE'" >&2; exit 1 ;;
+esac
+
 dataset_config() {
     local dataset="$1"
+    case "$dataset" in
+        synthetic|stocks|wind|weather|DuckDuckGeese) ;;
+        *) echo "Dataset '$dataset' is outside the selected rerun allow-list" >&2; return 1 ;;
+    esac
     case "$dataset" in
         ArticularyWordRecognition) printf '%s\t%s\t%s\t%s\t%s\n' "$dataset" "$UEA_BASE_DIR/ArticularyWordRecognition" 28 300 10000 ;;
         AtrialFibrillation) printf '%s\t%s\t%s\t%s\t%s\n' "$dataset" "$UEA_BASE_DIR/AtrialFibrillation" 128 15 10000 ;;
@@ -122,14 +140,7 @@ dataset_config() {
 }
 
 all_datasets() {
-    printf '%s\n' \
-        ArticularyWordRecognition AtrialFibrillation BasicMotions CharacterTrajectories \
-        Cricket DuckDuckGeese EigenWorms Epilepsy ERing EthanolConcentration \
-        FaceDetection FingerMovements HandMovementDirection Handwriting Heartbeat \
-        InsectWingbeat JapaneseVowels Libras LSST MotorImagery NATOPS PEMS-SF \
-        PenDigits PhonemeSpectra RacketSports SelfRegulationSCP1 SelfRegulationSCP2 \
-        SpokenArabicDigits StandWalkJump UWaveGestureLibrary \
-        synthetic weather stocks wind
+    printf '%s\n' synthetic stocks wind weather DuckDuckGeese
 }
 
 append_runtime() {
@@ -239,7 +250,11 @@ run_dataset() {
             --seed "$SEED"
             --checkpoint-interval "$CHECKPOINT_INTERVAL"
             --accuracy-target "$ACCURACY_TARGET"
+            --target-recall "$TARGET_RECALL"
             --model-score-threshold "$MODEL_SCORE_THRESHOLD"
+            --model-type "$MODEL_TYPE"
+            --k-values "${K_VALUES[@]}"
+            --noise-values "${NOISE_VALUES[@]}"
             "${normalize_args[@]}"
             --benchmark-algorithms MSINDEX MASS MSINDEXPP
             --skip-eval
@@ -252,6 +267,11 @@ run_dataset() {
             "$private_root/.training.done" "$private_root/training_suite.log" \
             "${train_cmd[@]}"
 
+        if [[ "$TRAIN_ONLY" == "true" ]]; then
+            export_variant_results "$dataset" "$variant" "$private_root" "$dataset_result"
+            continue
+        fi
+
         local eval_cmd=(
             --artifact-root "$private_root"
             --dataset-spec "$spec"
@@ -261,13 +281,18 @@ run_dataset() {
             --seed "$SEED"
             --checkpoint-interval "$CHECKPOINT_INTERVAL"
             --accuracy-target "$ACCURACY_TARGET"
+            --target-recall "$TARGET_RECALL"
             --model-score-threshold "$MODEL_SCORE_THRESHOLD"
+            --model-type "$MODEL_TYPE"
+            --k-values "${K_VALUES[@]}"
+            --noise-values "${NOISE_VALUES[@]}"
             "${normalize_args[@]}"
             --benchmark-algorithms MSINDEX MASS MSINDEXPP
             --skip-train
             --skip-benchmark
         )
         if [[ "$EXPORT_LOWER_BOUNDS" == "true" ]]; then eval_cmd+=(--export-lower-bounds); fi
+        if [[ "$EXPORT_EVALUATION_TRACE" == "true" ]]; then eval_cmd+=(--export-evaluation-trace); fi
         if [[ "$RESUME" != "true" ]]; then eval_cmd+=(--force); fi
         if [[ "$EXPORT_LOWER_BOUNDS" == "true" && -f "$private_root/.evaluation.done" \
               && -z "$(find "$private_root/$dataset/eval_runs" -name lower_bounds.jsonl -type f -size +0c -print -quit 2>/dev/null)" ]]; then
@@ -276,7 +301,7 @@ run_dataset() {
         run_phase evaluation "$variant" "$private_root" "$runtime_csv" \
             "$private_root/.evaluation.done" "$private_root/evaluation_suite.log" \
             "${eval_cmd[@]}"
-        if [[ "$variant" == "joint" ]]; then
+        if [[ "$variant" == "raw" || "$variant" == "normalized" || "$variant" == "joint" ]]; then
             local benchmark_cmd=(
                 --artifact-root "$private_root"
                 --dataset-spec "$spec"
@@ -286,7 +311,11 @@ run_dataset() {
                 --seed "$SEED"
                 --checkpoint-interval "$CHECKPOINT_INTERVAL"
                 --accuracy-target "$ACCURACY_TARGET"
+                --target-recall "$TARGET_RECALL"
                 --model-score-threshold "$MODEL_SCORE_THRESHOLD"
+                --model-type "$MODEL_TYPE"
+                --k-values "${K_VALUES[@]}"
+                --noise-values "${NOISE_VALUES[@]}"
                 "${normalize_args[@]}"
                 --benchmark-algorithms MSINDEX MASS MSINDEXPP
                 --skip-train

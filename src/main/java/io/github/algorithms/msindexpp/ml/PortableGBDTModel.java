@@ -12,20 +12,28 @@ import java.util.Map;
 public class PortableGBDTModel {
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
+    public static final String TARGET_SPECIFIC_CLASSIFIER = "target_specific_classifier";
+    public static final String TARGET_INDEPENDENT_REGRESSOR = "target_independent_regressor";
+
+    private final String modelType;
     private final List<String> featureNames;
     private final double learningRate;
     private final double initScore;
     private final List<Tree> trees;
     private final Double constantProbability;
+    private final Double constantRecall;
     private final Double conformalThreshold;
 
-    private PortableGBDTModel(List<String> featureNames, double learningRate, double initScore, List<Tree> trees,
-                              Double constantProbability, Double conformalThreshold) {
+    private PortableGBDTModel(String modelType, List<String> featureNames, double learningRate, double initScore,
+                              List<Tree> trees, Double constantProbability, Double constantRecall,
+                              Double conformalThreshold) {
+        this.modelType = modelType;
         this.featureNames = featureNames;
         this.learningRate = learningRate;
         this.initScore = initScore;
         this.trees = trees;
         this.constantProbability = constantProbability;
+        this.constantRecall = constantRecall;
         this.conformalThreshold = conformalThreshold;
     }
 
@@ -48,11 +56,13 @@ public class PortableGBDTModel {
         }
 
         return new PortableGBDTModel(
+                root.path("model_type").asText(TARGET_SPECIFIC_CLASSIFIER),
                 featureNames,
                 root.path("learning_rate").asDouble(),
                 root.path("init_score").asDouble(),
                 trees,
                 root.has("constant_probability") ? root.path("constant_probability").asDouble() : null,
+                root.has("constant_recall") ? root.path("constant_recall").asDouble() : null,
                 root.has("conformal_threshold")   ? root.path("conformal_threshold").asDouble()   : null
         );
     }
@@ -60,6 +70,10 @@ public class PortableGBDTModel {
     /** Returns the conformal threshold calibrated during training, or null for older models. */
     public Double getConformalThreshold() {
         return conformalThreshold;
+    }
+
+    public boolean isTargetIndependent() {
+        return TARGET_INDEPENDENT_REGRESSOR.equals(modelType);
     }
 
     public double predictProbability(TraversalFeatureSnapshot snapshot) {
@@ -73,6 +87,29 @@ public class PortableGBDTModel {
             rawScore += learningRate * tree.predict(featureMap, featureNames);
         }
         return 1d / (1d + Math.exp(-rawScore));
+    }
+
+    public double predictRecall(TraversalFeatureSnapshot snapshot) {
+        if (!isTargetIndependent()) {
+            throw new IllegalStateException("Model is not a target-independent recall regressor");
+        }
+        if (constantRecall != null) {
+            return clampRecall(constantRecall);
+        }
+        if (constantProbability != null) {
+            return clampRecall(constantProbability);
+        }
+
+        Map<String, Double> featureMap = snapshot.toFeatureMap();
+        double prediction = initScore;
+        for (Tree tree : trees) {
+            prediction += learningRate * tree.predict(featureMap, featureNames);
+        }
+        return clampRecall(prediction);
+    }
+
+    private double clampRecall(double recall) {
+        return Math.max(0d, Math.min(1d, recall));
     }
 
     private static int[] toIntArray(JsonNode node) {

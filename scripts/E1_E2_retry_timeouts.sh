@@ -23,14 +23,9 @@ SUBMIT="${SUBMIT:-0}"
 DATASETS=(
   "weather|weather:$WEATHER_DIR:1488:100:8784|16384"
   "DuckDuckGeese|DuckDuckGeese:$UEA_BASE_DIR/DuckDuckGeese:54:50|10000"
-  "FaceDetection|FaceDetection:$UEA_BASE_DIR/FaceDetection:20:5890|10000"
-  "Heartbeat|Heartbeat:$UEA_BASE_DIR/Heartbeat:81:205|10000"
-  "InsectWingbeat|InsectWingbeat:$UEA_BASE_DIR/InsectWingbeat:2:25000|10000"
-  "MotorImagery|MotorImagery:$UEA_BASE_DIR/MotorImagery:600:278:600|10000"
-  "PEMS-SF|PEMS-SF:$UEA_BASE_DIR/PEMS-SF:28:267|10000"
-  "PhonemeSpectra|PhonemeSpectra:$UEA_BASE_DIR/PhonemeSpectra:43:3353|10000"
-  "SelfRegulationSCP1|SelfRegulationSCP1:$UEA_BASE_DIR/SelfRegulationSCP1:179:293|10000"
-  "SpokenArabicDigits|SpokenArabicDigits:$UEA_BASE_DIR/SpokenArabicDigits:4:6599|10000"
+  "synthetic|synthetic:$SYNTHETIC_DIR:1024:100:4096|4096"
+  "stocks|stocks:$STOCKS_DIR:730:100:22335|16384"
+  "wind|wind:$WIND_DIR:1800:1:432000|32768"
 )
 
 quote_join() {

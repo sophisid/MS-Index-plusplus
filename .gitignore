@@ -183,3 +183,7 @@ scripts/generate_hybrid_tikz_batch.py
 scripts/generate_hybrid_pipeline_tikz.py
 scripts/generate_hybrid_focus_2panel_tikz.py
 scripts/generate_early_termination_tikz.py
+artifacts_local_behavior/*
+artifacts_target_recall/*
+artifacts_hybrid_feature_importance/*
+artifacts_*

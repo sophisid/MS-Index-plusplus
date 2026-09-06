@@ -18,14 +18,7 @@ CAL="$SCRIPT_DIR/calibrate_conformal.py"
 
 RUN="/usr/bin/python3.10 $CAL --delta 0.1"
 
-for DATASET in \
-    ArticularyWordRecognition AtrialFibrillation BasicMotions CharacterTrajectories \
-    Cricket DuckDuckGeese EigenWorms Epilepsy ERing EthanolConcentration \
-    FaceDetection FingerMovements HandMovementDirection Handwriting Heartbeat \
-    InsectWingbeat JapaneseVowels Libras LSST MotorImagery NATOPS "PEMS-SF" \
-    PenDigits PhonemeSpectra RacketSports SelfRegulationSCP1 SelfRegulationSCP2 \
-    SpokenArabicDigits StandWalkJump UWaveGestureLibrary \
-    synthetic weather stocks wind; do
+for DATASET in synthetic stocks wind weather DuckDuckGeese; do
     $RUN \
         --model "$ARTIFACT_ROOT/$DATASET/gbdt-model.json" \
         --data  "$ARTIFACT_ROOT/$DATASET/training-data.jsonl"

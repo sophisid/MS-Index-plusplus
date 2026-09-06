@@ -3,6 +3,7 @@
 import argparse
 import csv
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -16,14 +17,20 @@ from functools import lru_cache
 
 
 ROOT = Path(__file__).resolve().parents[1]
-JAR_PATH = ROOT / "target" / "MS-Index-1.0-jar-with-dependencies.jar"
+JAR_PATH = Path(os.environ.get(
+    "JAR_PATH",
+    str(ROOT / "target" / "MS-Index-1.0-jar-with-dependencies.jar"),
+))
 TRAINER_PATH = ROOT / "scripts" / "train_msindexpp_gbdt.py"
 ARTIFACT_ROOT = ROOT / "artifacts" / "msindexpp_suite"
+
+TARGET_SPECIFIC_CLASSIFIER = "target_specific_classifier"
+TARGET_INDEPENDENT_REGRESSOR = "target_independent_regressor"
 
 K_VALUES = [1, 10, 100]
 NORMALIZE_VALUES = [False, True]
 FROM_INDEX_VALUES = [False, True]
-NOISE_VALUES = [round(v * 0.1, 1) for v in range(10)]
+NOISE_VALUES = [0.1, 0.3, 0.5, 0.7, 0.9]
 
 
 @dataclass(frozen=True)
@@ -322,16 +329,20 @@ def run_eval_combo(dataset: DatasetConfig, args, dataset_root: Path, model_path:
     key = combo_key(k, normalize, from_index, noise)
     stage_dir = dataset_root / "eval_runs" / key
     lower_bound_trace_path = stage_dir / "lower_bounds.jsonl"
+    evaluation_trace_path = stage_dir / "evaluation_trace.jsonl"
     extra_props = {
         "msindexpp.earlyTerminationEnabled": "true",
         "msindexpp.evaluationEnabled": "true",
         "msindexpp.checkpointInterval": str(args.checkpoint_interval),
         "msindexpp.modelScoreThreshold": str(args.model_score_threshold),
+        "msindexpp.targetRecall": str(args.target_recall),
         "msindexpp.artifactsDir": str(dataset_root),
         "msindexpp.modelPath": str(model_path),
     }
     if args.export_lower_bounds:
         extra_props["msindexpp.lowerBoundTracePath"] = str(lower_bound_trace_path)
+    if args.export_evaluation_trace:
+        extra_props["msindexpp.evaluationTracePath"] = str(evaluation_trace_path)
     row = maybe_run_java(
         stage_dir,
         "eval.log",
@@ -351,7 +362,12 @@ def run_eval_combo(dataset: DatasetConfig, args, dataset_root: Path, model_path:
             noise,
             "QUERY",
         ),
-        required_outputs=(lower_bound_trace_path,) if args.export_lower_bounds else (),
+        required_outputs=tuple(
+            path for enabled, path in (
+                (args.export_lower_bounds, lower_bound_trace_path),
+                (args.export_evaluation_trace, evaluation_trace_path),
+            ) if enabled
+        ),
     )
     return {
         "dataset": dataset.name,
@@ -361,13 +377,18 @@ def run_eval_combo(dataset: DatasetConfig, args, dataset_root: Path, model_path:
         "normalize": normalize,
         "from_index": from_index,
         "noise": noise,
+        "model_type": args.model_type,
+        "target_recall": args.target_recall,
         "avg_accuracy": parse_float(row, "msIndexPPEarlyTerminationAccuracySum") / args.n_queries,
         "early_stop_rate": parse_float(row, "msIndexPPEarlyStops") / args.n_queries,
         "avg_early_steps": parse_float(row, "msIndexPPEarlyTerminationSteps")
         / max(parse_int(row, "msIndexPPEarlyStops"), 1),
+        "model_inference_time_ns": parse_int(row, "msIndexPPModelInferenceTimeNs"),
+        "model_inference_calls": parse_int(row, "msIndexPPModelInferenceCalls"),
         "query_time_ms": parse_query_time_avg_ms(row),
         "query_time_total_ms": parse_float(row, "queryTime"),
         "lower_bound_trace_path": str(lower_bound_trace_path) if args.export_lower_bounds else "",
+        "evaluation_trace_path": str(evaluation_trace_path) if args.export_evaluation_trace else "",
     }
 
 
@@ -383,6 +404,7 @@ def run_timing_combo(dataset: DatasetConfig, args, dataset_root: Path, model_pat
             "msindexpp.earlyTerminationEnabled": "true",
             "msindexpp.checkpointInterval": str(args.checkpoint_interval),
             "msindexpp.modelScoreThreshold": str(args.model_score_threshold),
+            "msindexpp.targetRecall": str(args.target_recall),
             "msindexpp.artifactsDir": str(dataset_root),
             "msindexpp.modelPath": str(model_path),
         }
@@ -415,6 +437,10 @@ def run_timing_combo(dataset: DatasetConfig, args, dataset_root: Path, model_pat
         "normalize": normalize,
         "from_index": from_index,
         "noise": noise,
+        "model_type": args.model_type,
+        "target_recall": args.target_recall,
+        "model_inference_time_ns": parse_int(row, "msIndexPPModelInferenceTimeNs"),
+        "model_inference_calls": parse_int(row, "msIndexPPModelInferenceCalls"),
         "query_time_ms": parse_query_time_avg_ms(row),
         "query_time_total_ms": parse_float(row, "queryTime"),
         "index_build_time_ms": parse_float(row, "indexBuildTime"),
@@ -427,7 +453,7 @@ def train_dataset_model(dataset: DatasetConfig, args, experiment_start: int) -> 
     dataset_train_start = time.monotonic()
     dataset_root = ARTIFACT_ROOT / dataset.name
     train_data_path = dataset_root / "training-data.jsonl"
-    model_path = dataset_root / "gbdt-model.json"
+    model_path = Path(args.model_path) if args.model_path else dataset_root / "gbdt-model.json"
     trainer_metrics_path = dataset_root / "trainer_metrics.txt"
     train_results_path = dataset_root / "train_collection_results.jsonl"
     training_runtime_path = dataset_root / "training_runtime.json"
@@ -499,6 +525,8 @@ def train_dataset_model(dataset: DatasetConfig, args, experiment_start: int) -> 
             str(train_data_path),
             "--output",
             str(model_path),
+            "--model-type",
+            args.model_type,
         ],
         trainer_metrics_path,
     )
@@ -529,7 +557,7 @@ def train_dataset_model(dataset: DatasetConfig, args, experiment_start: int) -> 
 
 def evaluate_dataset_model(dataset: DatasetConfig, args, experiment_start: int) -> int:
     dataset_root = ARTIFACT_ROOT / dataset.name
-    model_path = dataset_root / "gbdt-model.json"
+    model_path = Path(args.model_path) if args.model_path else dataset_root / "gbdt-model.json"
     eval_results_path = dataset_root / "evaluation_results.jsonl"
     eval_runs_dir = dataset_root / "eval_runs"
     experiment_id = experiment_start
@@ -571,7 +599,7 @@ def evaluate_dataset_model(dataset: DatasetConfig, args, experiment_start: int) 
 
 def benchmark_dataset(dataset: DatasetConfig, args, experiment_start: int) -> int:
     dataset_root = ARTIFACT_ROOT / dataset.name
-    model_path = dataset_root / "gbdt-model.json"
+    model_path = Path(args.model_path) if args.model_path else dataset_root / "gbdt-model.json"
     timing_results_path = dataset_root / "timing_results.jsonl"
     experiment_id = experiment_start
     records = []
@@ -588,6 +616,7 @@ def benchmark_dataset(dataset: DatasetConfig, args, experiment_start: int) -> in
                 "msindexpp.earlyTerminationEnabled": "true",
                 "msindexpp.checkpointInterval": str(args.checkpoint_interval),
                 "msindexpp.modelScoreThreshold": str(args.model_score_threshold),
+                "msindexpp.targetRecall": str(args.target_recall),
                 "msindexpp.artifactsDir": str(dataset_root),
                 "msindexpp.modelPath": str(model_path),
             },
@@ -709,6 +738,16 @@ def summarize_dataset(dataset: str) -> Dict[str, Dict]:
             summary[f"{prefix}_query_time_min_ms"] = min(r["query_time_ms"] for r in rows)
             summary[f"{prefix}_query_time_max_ms"] = max(r["query_time_ms"] for r in rows)
             summary[f"{prefix}_index_build_avg_ms"] = sum(r["index_build_time_ms"] for r in rows) / len(rows)
+            if algorithm == "MSINDEXPP":
+                inference_ns = sum(r.get("model_inference_time_ns", 0.0) for r in rows)
+                inference_calls = sum(r.get("model_inference_calls", 0) for r in rows)
+                query_time = sum(r.get("query_time_total_ms", 0.0) for r in rows)
+                summary["msindexpp_model_inference_time_ms"] = inference_ns / 1_000_000.0
+                summary["msindexpp_model_inference_calls"] = inference_calls
+                summary["msindexpp_model_inference_pct_of_query"] = (
+                    100.0 * inference_ns / 1_000_000.0 / query_time
+                    if query_time > 0 else 0.0
+                )
 
     msindex_avg = summary.get("msindex_query_time_avg_ms")
     mass_avg = summary.get("mass_query_time_avg_ms")
@@ -747,11 +786,29 @@ def main() -> int:
     parser.add_argument("--seed", type=int, default=1)
     parser.add_argument("--checkpoint-interval", type=int, default=64)
     parser.add_argument("--accuracy-target", type=float, default=0.9)
+    parser.add_argument("--target-recall", type=float, default=0.9)
     parser.add_argument("--model-score-threshold", type=float, default=0.5)
+    parser.add_argument(
+        "--model-type",
+        choices=(TARGET_SPECIFIC_CLASSIFIER, TARGET_INDEPENDENT_REGRESSOR),
+        default=TARGET_SPECIFIC_CLASSIFIER,
+        help="Model family: TSA classifier or TIA recall regressor.",
+    )
+    parser.add_argument(
+        "--model-path",
+        type=Path,
+        default=None,
+        help="Optional model path override, useful when sharing one TIA model across target runs.",
+    )
     parser.add_argument(
         "--export-lower-bounds",
         action="store_true",
         help="Export all R-tree leaf-entry lower bounds and tau_k for each evaluation query.",
+    )
+    parser.add_argument(
+        "--export-evaluation-trace",
+        action="store_true",
+        help="Export exact/early/first-pass top-k distances for each evaluation query.",
     )
     parser.add_argument(
         "--normalize-values",

@@ -61,11 +61,13 @@ public class Parameters {
     public static boolean msIndexPPEvaluationEnabled = false;
     public static int msIndexPPCheckpointInterval = 64;
     public static double msIndexPPAccuracyTarget = 0.9;
+    public static double msIndexPPTargetRecall = 0.9;
     public static double msIndexPPModelScoreThreshold = 0.5;
     public static String msIndexPPArtifactsDir = "artifacts/msindexpp";
     public static String msIndexPPTrainingDataPath = "";
     public static String msIndexPPModelPath = "";
     public static String msIndexPPLowerBoundTracePath = "";
+    public static String msIndexPPEvaluationTracePath = "";
 
     @Hide
     public static Random random;
@@ -120,6 +122,10 @@ public class Parameters {
     public static AtomicLong msIndexPPEarlyStops = new AtomicLong(0);
     public static AtomicLong msIndexPPEarlyTerminationSteps = new AtomicLong(0);
     public static DoubleAdder msIndexPPEarlyTerminationAccuracySum = new DoubleAdder();
+    public static long msIndexPPModelInferenceTimeNs = 0L;
+    public static long msIndexPPModelInferenceCalls = 0L;
+    public static long hybridModelInferenceTimeNs = 0L;
+    public static long hybridModelInferenceCalls = 0L;
     public static double totalLeafVolume;
     public static double totalLeafLogVolume;
     public static double totalLeafMargin;
@@ -322,11 +328,13 @@ public class Parameters {
         msIndexPPEvaluationEnabled = Boolean.parseBoolean(System.getProperty("msindexpp.evaluationEnabled", String.valueOf(msIndexPPEvaluationEnabled)));
         msIndexPPCheckpointInterval = Integer.parseInt(System.getProperty("msindexpp.checkpointInterval", String.valueOf(msIndexPPCheckpointInterval)));
         msIndexPPAccuracyTarget = Double.parseDouble(System.getProperty("msindexpp.accuracyTarget", String.valueOf(msIndexPPAccuracyTarget)));
+        msIndexPPTargetRecall = Double.parseDouble(System.getProperty("msindexpp.targetRecall", String.valueOf(msIndexPPTargetRecall)));
         msIndexPPModelScoreThreshold = Double.parseDouble(System.getProperty("msindexpp.modelScoreThreshold", String.valueOf(msIndexPPModelScoreThreshold)));
         msIndexPPArtifactsDir = System.getProperty("msindexpp.artifactsDir", msIndexPPArtifactsDir);
         msIndexPPTrainingDataPath = System.getProperty("msindexpp.trainingDataPath", msIndexPPTrainingDataPath);
         msIndexPPModelPath = System.getProperty("msindexpp.modelPath", msIndexPPModelPath);
         msIndexPPLowerBoundTracePath = System.getProperty("msindexpp.lowerBoundTracePath", msIndexPPLowerBoundTracePath);
+        msIndexPPEvaluationTracePath = System.getProperty("msindexpp.evaluationTracePath", msIndexPPEvaluationTracePath);
     }
 
     private static void setMSIndexPPArtifactPaths() {

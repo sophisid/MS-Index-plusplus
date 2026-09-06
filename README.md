@@ -40,17 +40,22 @@ The `MSINDEXPP` now supports:
 - training an external Python GBDT model per dataset
 - loading the exported model in Java and deciding whether to stop the second-pass traversal early
 
+Two approximate model families are available:
+- `target_specific_classifier` (TSA): the existing implementation, trained separately for each requested target
+- `target_independent_regressor` (TIA): a DARTH-like implementation, trained once to predict actual recall and evaluated with the requested target at runtime
+
 Each training row is a checkpoint snapshot of the form:
 - `[features_at_checkpoint] -> continue`
 - `[features_at_checkpoint] -> stop`
 
-During training-data collection, Java runs the full second pass once, then replays each checkpoint prefix through `postFilter(...)` to measure the achieved top-k overlap against the final exact top-k. The row is labeled `stop` when that overlap is at least `msindexpp.accuracyTarget`; otherwise it is labeled `continue`.
+During training-data collection, Java runs the full second pass once, then replays each checkpoint prefix through `postFilter(...)` to measure the achieved top-k overlap against the final exact top-k. TSA uses the requested `msindexpp.accuracyTarget` to create `stop`/`continue` labels. TIA uses the same `achieved_accuracy` values as regression targets and does not depend on a requested target during training.
 
 The extra `MSINDEXPP` configuration is passed as JVM system properties:
 - `-Dmsindexpp.trainingEnabled=true`
 - `-Dmsindexpp.earlyTerminationEnabled=true`
 - `-Dmsindexpp.checkpointInterval=64`
 - `-Dmsindexpp.accuracyTarget=0.9`
+- `-Dmsindexpp.targetRecall=0.9` (TIA runtime target)
 - `-Dmsindexpp.modelScoreThreshold=0.5`
 - `-Dmsindexpp.artifactsDir=artifacts/msindexpp`
 - `-Dmsindexpp.trainingDataPath=...` (optional override)
@@ -76,6 +81,63 @@ python3 scripts/train_msindexpp_gbdt.py \
   --input artifacts/msindexpp/synthetic/training-data.jsonl \
   --output artifacts/msindexpp/synthetic/gbdt-model.json
 ```
+
+The current target-specific model is named **TSA** (`target_specific_classifier`). To train the target-independent approximate model, use **TIA** (`target_independent_regressor`):
+
+```bash
+python3 scripts/train_msindexpp_gbdt.py \
+  --model-type target_independent_regressor \
+  --input artifacts/msindexpp/synthetic/training-data.jsonl \
+  --output artifacts/msindexpp/synthetic/tia-model.json
+```
+
+The Slurm/local sweep wrappers are `scripts/run_target_recall_sweep.sh` for TSA and `scripts/run_target_independent_recall_sweep.sh` for TIA. Keep their artifact roots separate (`artifacts_target_specific` and `artifacts_target_independent`).
+
+The current rerun is restricted to `synthetic`, `stocks`, `wind`, `weather`, and
+`DuckDuckGeese`.  The requested experiment order is:
+
+```bash
+# Hybrid raw/normalized/joint training and query-time runs
+bash scripts/HYBRID_jobs.sh --submit
+
+# Approximate raw/normalized/joint training times (run once for each family)
+MODEL_TYPE=target_specific_classifier bash scripts/run_approximate_training_matrix.sh
+MODEL_TYPE=target_independent_regressor bash scripts/run_approximate_training_matrix.sh
+
+# To also time all three approximate variants at Rt=0.90:
+TRAIN_ONLY=false RESUME=true MODEL_TYPE=target_specific_classifier bash scripts/run_approximate_training_matrix.sh
+TRAIN_ONLY=false RESUME=true MODEL_TYPE=target_independent_regressor bash scripts/run_approximate_training_matrix.sh
+
+# TSA at Rt=0.90 and TIA at Rt in {0.80,0.85,0.90,0.95,0.99}
+bash scripts/run_target_recall_sweep.sh
+bash scripts/run_target_independent_recall_sweep.sh
+
+# Convert TIA top-1 distance traces for the regressor-distance plot
+python3.10 scripts/plot_regressor_distance.py
+
+# Summarize #2 (model inference time as a percentage of query time)
+python3.10 scripts/summarize_inference_overhead.py \
+  --approx-root artifacts_approx_regressor/results
+```
+
+For the complete Slurm run, use the single orchestrator below. It submits five
+Hybrid jobs in parallel, then serializes the TSA/TIA matrices and recall
+sweeps with `afterok` dependencies:
+
+```bash
+bash scripts/run_all_selected_experiments_slurm.sh --print-commands
+bash scripts/run_all_selected_experiments_slurm.sh --submit
+```
+
+The submission manifest and Slurm logs are written under
+`slurm_all_experiments/`. The orchestrator has a fixed allow-list containing
+only the five datasets above. Its default Slurm wall-time limit is seven days;
+override it before submission with, for example, `SBATCH_TIME=2-00:00:00` if
+the selected partition allows only two days.
+
+All query-time reruns use `k={1,10,100}` and noise `{0.1,0.3,0.5,0.7,0.9}`.  The TIA
+sweep also exports per-query distance traces and model-inference counters for
+the target-recall and top-1-distance analyses.
 
 The trainer now:
 - splits train/test by `query_id` when possible, so checkpoints from the same query do not leak into both sets

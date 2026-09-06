@@ -25,7 +25,8 @@ ARTIFACT_ROOT="$ROOT/artifacts/msindexpp_suite"
 
 RUN="/usr/bin/python3.10 $SUITE --artifact-root $ARTIFACT_ROOT --n-queries $N_QUERIES --max-workers $MAX_WORKERS --seed $SEED --benchmark-algorithms MSINDEX MASS MSINDEXPP"
 
-# --- 30 UEA datasets ---
+# --- Legacy UEA commands retained for reference but disabled for this rerun ---
+if false; then
 $RUN --dataset-spec "ArticularyWordRecognition:$UEA_BASE_DIR/ArticularyWordRecognition:28:300"   --max-m 10000
 $RUN --dataset-spec "AtrialFibrillation:$UEA_BASE_DIR/AtrialFibrillation:128:15"               --max-m 10000
 $RUN --dataset-spec "BasicMotions:$UEA_BASE_DIR/BasicMotions:20:40"                             --max-m 10000
@@ -56,9 +57,11 @@ $RUN --dataset-spec "SelfRegulationSCP2:$UEA_BASE_DIR/SelfRegulationSCP2:230:200
 $RUN --dataset-spec "SpokenArabicDigits:$UEA_BASE_DIR/SpokenArabicDigits:4:6599"               --max-m 10000
 $RUN --dataset-spec "StandWalkJump:$UEA_BASE_DIR/StandWalkJump:500:15:500"                     --max-m 10000
 $RUN --dataset-spec "UWaveGestureLibrary:$UEA_BASE_DIR/UWaveGestureLibrary:63:320"             --max-m 10000
+fi
 
-# --- 4 custom datasets ---
+# --- Selected rerun datasets ---
 $RUN --dataset-spec "synthetic:$SYNTHETIC_DIR:1024:100:4096"  --max-m 4096
 $RUN --dataset-spec "weather:$WEATHER_DIR:1488:100:8784"      --max-m 16384
 $RUN --dataset-spec "stocks:$STOCKS_DIR:730:100:22335"        --max-m 16384
 $RUN --dataset-spec "wind:$WIND_DIR:1800:1:432000"            --max-m 32768
+$RUN --dataset-spec "DuckDuckGeese:$UEA_BASE_DIR/DuckDuckGeese:54:50:10000" --max-m 10000

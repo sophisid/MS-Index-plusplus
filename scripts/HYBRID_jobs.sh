@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # HYBRID_jobs.sh
 #
-# Run the HYBRID routing experiment independently for each dataset, or submit
-# one Slurm job per dataset.  The default evaluation matrix is:
+# Run the HYBRID routing experiment independently for each selected dataset,
+# or submit one Slurm job per dataset.  The default evaluation matrix is:
 #   raw model -> raw
 #   normalized model -> normalized
 #   joint model -> raw and normalized
@@ -50,13 +50,14 @@ if [[ "$RESULT_ROOT" != /* ]]; then RESULT_ROOT="$ROOT/$RESULT_ROOT"; fi
 N_OVERRIDE="${N_OVERRIDE:-}"
 TRAIN_QUERIES="${TRAIN_QUERIES:-100}"
 EVAL_QUERIES="${EVAL_QUERIES:-100}"
-SEED_LIST="${SEED_LIST:-1 3 5 7}"
-NOISE_LIST="${NOISE_LIST:-0.0 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9}"
+SEED_LIST="${SEED_LIST:-1}"
+NOISE_LIST="${NOISE_LIST:-0.1 0.3 0.5 0.7 0.9}"
 EVAL_SEED="${EVAL_SEED:-9}"
 EVAL_MATRIX="${EVAL_MATRIX:-matched}"
 RESUME="${RESUME:-true}"
 CLEANUP_TRAINING_DATA="${CLEANUP_TRAINING_DATA:-false}"
 CLEANUP_TRAIN_RUNS="${CLEANUP_TRAIN_RUNS:-false}"
+TRAIN_ONLY="${TRAIN_ONLY:-false}"
 SBATCH_TIME="${SBATCH_TIME:-48:00:00}"
 SBATCH_PARTITION="${SBATCH_PARTITION:-}"
 SBATCH_MEM="${SBATCH_MEM:-}"
@@ -86,6 +87,10 @@ IFS=' ' read -r -a NOISE_VALUES <<< "$NOISE_LIST"
 
 dataset_config() {
     local dataset="$1"
+    case "$dataset" in
+        synthetic|stocks|wind|weather|DuckDuckGeese) ;;
+        *) echo "Dataset '$dataset' is outside the selected rerun allow-list" >&2; return 1 ;;
+    esac
     case "$dataset" in
         ArticularyWordRecognition) printf '%s\t%s\t%s\t%s\t%s\n' "$dataset" "$UEA_BASE_DIR/ArticularyWordRecognition" 28 300 10000 ;;
         AtrialFibrillation) printf '%s\t%s\t%s\t%s\t%s\n' "$dataset" "$UEA_BASE_DIR/AtrialFibrillation" 128 15 10000 ;;
@@ -126,14 +131,7 @@ dataset_config() {
 }
 
 all_datasets() {
-    printf '%s\n' \
-        ArticularyWordRecognition AtrialFibrillation BasicMotions CharacterTrajectories \
-        Cricket DuckDuckGeese EigenWorms Epilepsy ERing EthanolConcentration \
-        FaceDetection FingerMovements HandMovementDirection Handwriting Heartbeat \
-        InsectWingbeat JapaneseVowels Libras LSST MotorImagery NATOPS PEMS-SF \
-        PenDigits PhonemeSpectra RacketSports SelfRegulationSCP1 SelfRegulationSCP2 \
-        SpokenArabicDigits StandWalkJump UWaveGestureLibrary \
-        synthetic weather stocks wind
+    printf '%s\n' synthetic stocks wind weather DuckDuckGeese
 }
 
 csv_header_if_missing() {
@@ -263,8 +261,13 @@ train_model() {
     local variant="$2"
     local input_csv="$3"
     local model_path="$result_root/models/$variant/gbdt-model.json"
+    local importance_path="$result_root/models/$variant/feature_importance.csv"
     local log_path="$result_root/models/$variant/train.log"
     local runtime_csv="$result_root/model_runtime.csv"
+    local trainer_args=()
+    if [[ -n "${HYBRID_EXCLUDE_FEATURES:-}" ]]; then
+        trainer_args+=(--exclude-features "$HYBRID_EXCLUDE_FEATURES")
+    fi
 
     if [[ "$RESUME" == "true" && -f "$model_path" ]]; then
         return 0
@@ -275,7 +278,9 @@ train_model() {
     start="$(date +%s)"
     if "$PYTHON_BIN" "$ROOT/scripts/train_hybrid_gbdt.py" \
         --input "$input_csv" \
-        --output "$model_path" >"$log_path" 2>&1; then
+        --output "$model_path" \
+        --feature-importance-output "$importance_path" \
+        "${trainer_args[@]}" >"$log_path" 2>&1; then
         end="$(date +%s)"
         elapsed=$((end - start))
         append_runtime "$runtime_csv" "model_training" "$variant" "" "" "" "" "$elapsed" ok "$log_path"
@@ -436,6 +441,11 @@ run_dataset() {
     train_model "$result_dataset_root" joint "$joint_training"
     model_end="$(date +%s)"
     cleanup_training_artifacts "$training_dataset_root"
+
+    if [[ "$TRAIN_ONLY" == "true" ]]; then
+        echo "[$(date -Is)] DONE dataset=$dataset training-only results=$result_dataset_root"
+        return 0
+    fi
 
     local variant eval_normalize
     evaluation_start="$(date +%s)"
