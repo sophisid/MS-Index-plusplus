@@ -33,7 +33,7 @@ The parameters in the `run.sh` script are as follows:
 - `queryNoiseEps`: Level of noise added to queries when generated from indexed data (default: 0.1)
 
 ## Data
-Instructions on how to get the data from the paper can be found in [data/instructions.md](data/instructions.md).
+The time-series datasets can be browsed in the [Time Series Classification dataset catalog](https://www.timeseriesclassification.com/dataset.php). Instructions for obtaining and preparing the datasets used in the paper are in [data/instructions.md](data/instructions.md).
 
 ## Early termination and hybrid search
 

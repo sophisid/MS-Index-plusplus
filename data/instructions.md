@@ -6,7 +6,7 @@ This Google Drive contains the following datasets:
 - Weather
 - Synthetic
 
-The datasets from the UEA archive such as DuckDuckGeese can be found on the website of the respective paper: [https://www.timeseriesclassification.com/](http://www.timeseriesclassification.com/aeon-toolkit/Archives/Multivariate2018_ts.zip)
+Datasets from the UEA archive, such as DuckDuckGeese, can be found in the [Time Series Classification dataset catalog](https://www.timeseriesclassification.com/dataset.php).
 After downloading the data from the above sources, one needs to preprocess it through the guidelines in the next section.
 
 # Running own data
