@@ -7,5 +7,6 @@ public enum AlgorithmType {
     ST_INDEX,
     MSINDEX,
     MSINDEXPP,
+    HYBRID,
     KV_MATCH
 }

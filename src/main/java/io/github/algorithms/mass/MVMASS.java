@@ -122,6 +122,13 @@ public class MVMASS extends Algorithm {
             FileInputStream fileIn = new FileInputStream(filename);
             DataInputStream in = new DataInputStream(fileIn);
             MVMASS mass = new MVMASS();
+            final double[][][] data = DataManager.data;
+            mass.timeseriesFFTs = new double[data.length][channels][];
+            for (int i = 0; i < data.length; i++) {
+                for (int d = 0; d < channels; d++) {
+                    mass.timeseriesFFTs[i][d] = new double[lib.nextPowerOfTwo(data[i][d].length)];
+                }
+            }
             mass.readObject(in);
             in.close();
             fileIn.close();

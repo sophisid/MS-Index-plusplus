@@ -1,6 +1,8 @@
 package io.github.algorithms.msindex;
 
 import io.github.algorithms.Algorithm;
+import io.github.algorithms.msindexpp.ml.LowerBoundTraceWriter;
+import io.github.algorithms.msindexshared.RelativeContrastEstimator;
 import io.github.algorithms.msindexshared.BoundedPriorityQueue;
 import io.github.algorithms.msindexshared.segmentation.SegmentMethods;
 import io.github.utils.KMeans;
@@ -121,8 +123,26 @@ public class MSIndex extends Algorithm {
 
 //        Derive an initial top k.
         final ArrayList<CandidateMVSubsequence> initialTopK = firstPass(k, query, queryMBR);
-        final double kThDistance = initialTopK.get(k - 1).totalDistance;
+        final double kThDistance = Math.max(0d, initialTopK.get(k - 1).totalDistance);
         Logger.getGlobal().info("[MS-Index] k-th distance after initial topK: " + kThDistance);
+
+        if (msIndexPPLowerBoundTracePath != null && !msIndexPPLowerBoundTracePath.isBlank()) {
+            try {
+                LowerBoundTraceWriter.appendQuery(
+                        msIndexPPLowerBoundTracePath,
+                        currQueryId,
+                        k,
+                        kThDistance,
+                        Boolean.parseBoolean(System.getProperty("msindexpp.computeRelativeContrast", "true"))
+                                ? RelativeContrastEstimator.estimateAll(query, 1, 10, 100)
+                                : null,
+                        queryMBR,
+                        tree
+                );
+            } catch (IOException e) {
+                Logger.getGlobal().warning("[MS-Index] Could not persist lower-bound trace: " + e.getMessage());
+            }
+        }
 
 //        Derive the exact topK
         final ArrayList<CandidateMVSubsequence> finalTopK = secondPass(k, query, queryMBR, kThDistance);

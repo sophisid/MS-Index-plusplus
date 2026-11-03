@@ -1,6 +1,6 @@
 #!/bin/bash
 
-algorithmType=MSINDEX # algorithm type: MSINDEX, BRUTE_FORCE, MASS, ST_INDEX, DSTREE, KV_MATCH
+algorithmType=MSINDEX # algorithm type: MSINDEX, MSINDEXPP, HYBRID, BRUTE_FORCE, MASS, ST_INDEX, DSTREE, KV_MATCH
 dataPath=data/synthetic # path to the data directory
 N=100 # number of time series
 channels=-1 # -1 means all channels
